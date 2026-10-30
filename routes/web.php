@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Events\ListEventsController;
 use Illuminate\Support\Facades\Route;
 
-Route::inertia('/', 'welcome')->name('home');
+Route::get('/', ListEventsController::class)->middleware('throttle:60,1')->name('home');

@@ -185,27 +185,106 @@ Laravel and typed Inertia props, with focused HTTP/frontend tests passing.
 **Forbidden:** Polished calendar/hero/card design (Slice 2), hold or checkout
 mutations, inventory accounting, admin CRUD, Stripe or copied Luma assets.
 
-## Slice 2 — The Luma-inspired event browsing page
+## Slice 2A — Event browsing behaviour and pagination
 
-**Customer-visible result:** A polished, responsive event calendar and
-Upcoming/Past event browsing page.
+**Customer-visible result:** Customers can browse Upcoming and Past
+events in separate views, with Upcoming selected by default. Events
+load progressively as customers scroll, without downloading the
+entire catalogue.
 
 **In scope:**
 
-- Recreate the *layout hierarchy and interactions* of
-  https://luma.com/venicebookclub: organizer hero/cover, calendar identity,
-  month navigation, Upcoming/Past switching, image-led event items/cards,
-  date, title, organizer, venue and ticket availability.
-- Use **original** brand, text, seeded events and visual assets. Avoid
-  reproducing protected Luma imagery, copy or branding.
-- Inertia/React TypeScript components with responsive desktop and mobile
-  layouts, keyboard/focus support, empty and sold-out states.
-- Human visual QA against fresh reference screenshots at desktop and mobile
-  sizes, plus interaction QA for month and status navigation.
+- Replace the combined Upcoming/Past listing with two separate views.
+- Default to Upcoming when opening the event browsing page.
+- Allow customers to switch between Upcoming and Past.
+- Preserve the selected view in the URL and browser history.
+- Upcoming events appear in ascending start-time order.
+- Past events appear in descending start-time order.
+- Implement server-side pagination using PostgreSQL.
+- Prefer cursor pagination with deterministic ordering by
+  event start time and ID.
+- Implement infinite scrolling to progressively retrieve and
+  append additional events.
+- Ensure pagination works correctly with Inertia navigation
+  and the existing React/TypeScript architecture.
+- Investigate the installed Inertia version's native
+  infinite-scrolling capabilities before proposing custom
+  implementations or additional dependencies.
+- Preserve the existing typed DTO/Inertia data boundaries,
+  extending them only where necessary.
+- Handle loading, empty, error and end-of-results states.
+- Prevent duplicate or missing events during pagination.
+- Preserve correct event-local date/time presentation.
+- Test pagination boundaries, ordering, view switching,
+  browser history, query efficiency and failure recovery.
+- Test with more events than a single page can contain.
 
-**Exit evidence:** Demo navigation on desktop/mobile; screenshots and tests for
-month boundaries, upcoming/past and correct event-local date labels.
-**Forbidden:** Building an admin panel or starting payment integration.
+**Exit evidence:**
+
+- Upcoming is the default view.
+- Switching to Past displays past events only.
+- Each view uses the correct chronological ordering.
+- Scrolling loads subsequent pages without duplicates.
+- Database queries retrieve bounded pages rather than
+  loading the entire event catalogue.
+- Browser Back/Forward navigation works correctly.
+- Loading, empty, error and end-of-results states work.
+- Backend and React tests pass.
+- Desktop and mobile browser QA passes.
+
+**Forbidden:**
+
+- Final Luma-inspired styling or visual design.
+- Calendar/month navigation.
+- Event detail pages.
+- Ticket selection or checkout.
+- Capacity accounting, holds or Stripe.
+- Admin functionality or new dependencies without approval.
+
+
+## Slice 2B — Luma-inspired event calendar and visual design
+
+**Customer-visible result:** A polished, responsive event browsing
+experience inspired by the layout hierarchy and interactions of
+https://luma.com/venicebookclub.
+
+**In scope:**
+
+- Create an original organizer identity and visual presentation.
+- Build the organizer hero and cover section.
+- Implement the calendar layout and month navigation.
+- Display events using image-led cards and clear event details.
+- Show event-local dates, times, organizer and venue information.
+- Integrate the Upcoming/Past views and infinite scrolling
+  implemented in Slice 2A into the finished design.
+- Ensure calendar dates and month grouping respect each event's
+  IANA timezone.
+- Use original branding, text, imagery and seeded event data.
+- Maintain responsive layouts for desktop and mobile.
+- Provide keyboard navigation, visible focus indicators,
+  semantic markup and accessible interactions.
+- Implement appropriate empty states and visual feedback.
+- Test calendar month/year boundaries, event grouping,
+  responsive behaviour and navigation.
+- Perform human visual QA against current reference screenshots
+  at desktop and mobile sizes.
+
+**Exit evidence:**
+
+- The browsing page follows the agreed Luma-inspired
+  information hierarchy and interaction patterns.
+- Calendar month navigation works correctly.
+- Upcoming/Past switching and infinite scrolling remain functional.
+- Event cards display correct information from PostgreSQL.
+- Event-local dates are grouped into the correct calendar months.
+- Desktop/mobile visual QA and accessibility checks pass.
+- React, TypeScript, backend regression and build checks pass.
+
+**Forbidden:**
+
+- Event management or admin functionality.
+- Event detail pages and ticket selection, which belong to Slice 3.
+- Checkout, holds, inventory accounting or Stripe.
 
 ## Slice 3 — Event detail and ticket selection
 
