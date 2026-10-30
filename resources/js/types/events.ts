@@ -24,7 +24,20 @@ export type EventListing = {
     ticketTypes: TicketTypeListing[];
 };
 
+export type EventView = 'upcoming' | 'past';
+export type EventListingPage = {
+    current_page: number;
+    current_page_url: string;
+    data: EventListing[];
+    first_page_url: string;
+    from: number | null;
+    next_page_url: string | null;
+    path: string;
+    per_page: number;
+    prev_page_url: string | null;
+    to: number | null;
+};
 export type EventListingPageProps = {
-    upcoming: EventListing[];
-    past: EventListing[];
+    view: EventView;
+    events: EventListingPage;
 };

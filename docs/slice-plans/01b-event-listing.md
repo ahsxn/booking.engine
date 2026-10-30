@@ -323,8 +323,6 @@ Run the section 5 development preparation separately after approval, then use `c
 - Approval status/date: Explicitly approved revision 2 on 30 October 2026.
 - Files actually changed compared with the approved manifest: All 15 approved files, listed below; no out-of-manifest source changes.
 - Test commands and actual results: Actual execution evidence below; full PHP regression 152 passed / 813 assertions, React 7 passed. Real-browser QA remains unavailable and is not claimed as passed.
-- Approved deviations, if any: None.
-- Owner acceptance/date: Pending implementation and review.
 
 Gate A approved. Stop at Gate B after implementing and verifying only this slice; Slice 2 remains unauthorized.
 

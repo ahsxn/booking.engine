@@ -1,72 +1,13 @@
-import { Head } from '@inertiajs/react';
-import type { EventListing, EventListingPageProps } from '@/types/events';
+import { Head, router, usePage } from '@inertiajs/react';
+import { useState } from 'react';
+import EventFeed from '@/components/events/event-feed';
+import { home } from '@/routes';
+import type { EventListingPageProps, EventView } from '@/types/events';
 
-type EventSectionProps = {
-    heading: string;
-    emptyMessage: string;
-    events: EventListing[];
-};
-
-function EventSection({ heading, emptyMessage, events }: EventSectionProps) {
-    return (
-        <section className="space-y-4">
-            <h2 className="text-2xl font-semibold">{heading}</h2>
-            {events.length === 0 ? (
-                <p>{emptyMessage}</p>
-            ) : (
-                <ul className="space-y-8">
-                    {events.map((event) => (
-                        <li key={event.id} className="space-y-2">
-                            <h3 className="text-xl font-semibold">
-                                {event.title}
-                            </h3>
-                            <p>{event.organizerName}</p>
-                            <p>
-                                {event.venueName} — {event.venueAddress}
-                            </p>
-                            <p>
-                                Starts:{' '}
-                                <time dateTime={event.startsAt}>
-                                    {event.startsAtLabel}
-                                </time>
-                                <br />
-                                Ends:{' '}
-                                <time dateTime={event.endsAt}>
-                                    {event.endsAtLabel}
-                                </time>
-                                <br />
-                                Time zone: {event.timezone}
-                            </p>
-                            {event.ticketTypes.length === 0 ? (
-                                <p>
-                                    No ticket information is listed for this
-                                    event.
-                                </p>
-                            ) : (
-                                <ul className="space-y-2">
-                                    {event.ticketTypes.map((ticket) => (
-                                        <li key={ticket.id}>
-                                            <p>
-                                                {ticket.name}:{' '}
-                                                {ticket.priceLabel}{' '}
-                                                {ticket.currency}
-                                            </p>
-                                            {ticket.description && (
-                                                <p>{ticket.description}</p>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </li>
-                    ))}
-                </ul>
-            )}
-        </section>
-    );
-}
-
-export default function EventsIndex({ upcoming, past }: EventListingPageProps) {
+export default function EventsIndex({ view, events }: EventListingPageProps) {
+    const [navigating, setNavigating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const { errors } = usePage().props;
     return (
         <>
             <Head title="Events" />
@@ -76,15 +17,79 @@ export default function EventsIndex({ upcoming, past }: EventListingPageProps) {
                     This is a read-only event listing. Booking is not available
                     yet.
                 </p>
-                <EventSection
-                    heading="Upcoming"
-                    emptyMessage="No upcoming events."
-                    events={upcoming}
-                />
-                <EventSection
-                    heading="Past"
-                    emptyMessage="No past events."
-                    events={past}
+                <nav aria-label="Event views" className="flex gap-6">
+                    {(['upcoming', 'past'] as const).map(
+                        (target: EventView) => (
+                            <a
+                                key={target}
+                                href={home.url({ query: { view: target } })}
+                                aria-current={
+                                    view === target ? 'page' : undefined
+                                }
+                                className="underline focus-visible:outline-2"
+                                onClick={(event) => {
+                                    if (
+                                        event.defaultPrevented ||
+                                        event.button !== 0 ||
+                                        event.metaKey ||
+                                        event.ctrlKey ||
+                                        event.shiftKey ||
+                                        event.altKey ||
+                                        (event.currentTarget.target &&
+                                            event.currentTarget.target !==
+                                                '_self')
+                                    ) {
+                                        return;
+                                    }
+                                    event.preventDefault();
+                                    router.visit(
+                                        home({ query: { view: target } }),
+                                        {
+                                            reset: ['events'],
+                                            only: ['view', 'events'],
+                                            preserveState: false,
+                                            preserveScroll: false,
+                                            onStart: () => {
+                                                setNavigating(true);
+                                                setError(null);
+                                            },
+                                            onFinish: () =>
+                                                setNavigating(false),
+                                            onNetworkError: () => {
+                                                setError(
+                                                    'Unable to switch views. Please try the view link again.',
+                                                );
+                                                return false;
+                                            },
+                                            onHttpException: (response) => {
+                                                setError(
+                                                    response.status === 429
+                                                        ? 'Too many requests; try again shortly'
+                                                        : 'Unable to switch views. Please try the view link again.',
+                                                );
+                                                return false;
+                                            },
+                                        },
+                                    );
+                                }}
+                            >
+                                {target === 'upcoming' ? 'Upcoming' : 'Past'}
+                            </a>
+                        ),
+                    )}
+                </nav>
+                <h2 className="text-2xl font-semibold">
+                    {view === 'upcoming' ? 'Upcoming' : 'Past'}
+                </h2>
+                {navigating && <p role="status">Loading events…</p>}
+                {(error || errors.view) && (
+                    <p role="alert">{error || errors.view}</p>
+                )}
+                <EventFeed
+                    key={view}
+                    view={view}
+                    events={events}
+                    navigating={navigating}
                 />
             </main>
         </>
