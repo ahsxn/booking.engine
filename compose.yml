@@ -1,36 +1,105 @@
+x-runtime: &runtime
+    image: booking-engine-dev
+    build:
+        context: .devcontainer
+        dockerfile: Dockerfile
+    init: true
+    working_dir: /workspaces/booking-engine
+    volumes:
+        - .:/workspaces/booking-engine
+    env_file:
+        - path: .env
+          required: false
+    environment: &runtime-environment
+        XDEBUG_MODE: 'off'
+        DB_CONNECTION: pgsql
+        DB_HOST: postgres
+        DB_PORT: '5432'
+        DB_DATABASE: ${DB_DATABASE:-laravel}
+        DB_USERNAME: ${DB_USERNAME:-laravel}
+        DB_PASSWORD: ${DB_PASSWORD:-secret}
+        DB_URL: ''
+        SESSION_DRIVER: database
+        CACHE_STORE: database
+        QUEUE_CONNECTION: database
+        DB_QUEUE_RETRY_AFTER: '90'
+    depends_on:
+        postgres:
+            condition: service_healthy
 
 services:
-  postgres:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: laravel
-      POSTGRES_USER: laravel
-      POSTGRES_PASSWORD: secret
-    ports:
-      - "127.0.0.1:5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U laravel -d laravel"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+    postgres:
+        image: postgres:17-alpine
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: laravel
+            POSTGRES_USER: laravel
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+            TZ: UTC
+            PGTZ: UTC
+        ports:
+            - '127.0.0.1:5432:5432'
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U laravel -d laravel']
+            interval: 5s
+            timeout: 5s
+            retries: 10
 
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    ports:
-      - "127.0.0.1:6379:6379"
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+    postgres-test:
+        image: postgres:17-alpine
+        profiles: [test]
+        environment:
+            POSTGRES_DB: laravel_test
+            POSTGRES_USER: laravel_test
+            POSTGRES_PASSWORD: secret
+            TZ: UTC
+            PGTZ: UTC
+        ports:
+            - '127.0.0.1:5433:5432'
+        tmpfs:
+            - /var/lib/postgresql/data
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U laravel_test -d laravel_test']
+            interval: 5s
+            timeout: 5s
+            retries: 10
+
+    app:
+        <<: *runtime
+        command: php artisan serve --host=0.0.0.0 --port=8000 --no-reload --no-interaction
+        ports:
+            - '127.0.0.1:8000:8000'
+        healthcheck:
+            test:
+                [
+                    'CMD',
+                    'curl',
+                    '--fail',
+                    '--silent',
+                    'http://127.0.0.1:8000/up',
+                ]
+            interval: 5s
+            timeout: 5s
+            retries: 10
+
+    vite:
+        <<: *runtime
+        command: npm run dev -- --host=0.0.0.0 --port=5173 --strictPort
+        ports:
+            - '127.0.0.1:5173:5173'
+
+    worker:
+        <<: *runtime
+        command: php artisan queue:work database --sleep=1 --tries=5 --timeout=60 --backoff=5 --no-interaction
+        restart: unless-stopped
+        stop_grace_period: 70s
+
+    scheduler:
+        <<: *runtime
+        command: php artisan schedule:work --no-interaction
+        restart: unless-stopped
 
 volumes:
-  postgres_data:
-  redis_data:
+    postgres_data:

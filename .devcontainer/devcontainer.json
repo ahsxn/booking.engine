@@ -5,9 +5,6 @@
         "context": ".."
     },
     "features": {
-        "ghcr.io/devcontainers/features/node:1": {
-            "version": "lts"
-        },
         "ghcr.io/devcontainers/features/docker-in-docker:4": {
             "moby": false,
             "dockerDashComposeVersion": "v2"
@@ -16,7 +13,7 @@
     "containerEnv": {
         "XDEBUG_MODE": "off"
     },
-    "postCreateCommand": "composer global require laravel/installer && echo 'export PATH=\"$PATH:$(composer global config bin-dir --absolute)\"' >> ~/.bashrc",
+    "forwardPorts": [8000, 5173],
     "customizations": {
         "vscode": {
             "settings": {
