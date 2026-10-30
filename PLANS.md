@@ -1,6 +1,13 @@
 # Ticketing v1 — vertical-slice implementation plan
 
-Status: **Proposed, no implementation approved.**
+Status: **Slice 0 accepted; later slices are proposed and require their own approvals.**
+
+**Roadmap revision (owner-agreed, 30 October 2026):** Split the original
+Slice 1 into two separately planned and accepted slices: **1A — Event domain
+and database** and **1B — Read-only Laravel/Inertia integration**. Slice 2
+remains the Luma-inspired browsing experience. The scopes and numbering of
+Slices 3–8 remain unchanged. This is a roadmap amendment, **not approval to
+implement either new slice**.
 
 **Operating rule:** every slice has **two distinct approvals**. First Codex
 inspects the current repository and proposes a detailed implementation plan
@@ -57,10 +64,13 @@ visibility of the code produced by earlier slices.
 ## Why vertical slices
 
 Each slice should produce a usable, reviewable part of the *actual* Laravel
-application, not a collection of isolated models or an unaudited giant build.
-Start with the visible event experience the owner wants, then develop atomic
-holds, the checkout shell, and a complete verified payment path. Reliability
-is tested from the first capacity-changing slice and hardened at each step.
+application, not an unaudited giant build. **Slice 1A is intentionally a
+backend-only foundation**, accepted through database inspection, real
+PostgreSQL tests and repeatable seeding rather than a customer-visible demo.
+Slice 1B then proves the smallest end-to-end Laravel/Inertia data path. Slice 2
+builds the polished public browsing experience. Atomic holds, checkout and a
+complete verified payment path follow. Reliability is tested from the first
+capacity-changing slice and hardened at each step.
 
 ## Slice 0 — Audit and prepare the existing Laravel application
 
@@ -89,24 +99,91 @@ customer authentication workflow.
 PostgreSQL connection, type check, asset build, and first test successfully.
 **Forbidden:** User accounts, admin pages, auth workflow, Redis or live Stripe.
 
-## Slice 1 — Seeded event domain and read-only data
+## Slice 1A — Event domain and database
 
-**Customer-visible result:** A server route returns usable upcoming/past event
-data with ticket prices and availability (even if styling is basic).
+**Detailed plan:** `docs/slice-plans/01a-event-domain.md` (revision 1,
+30 October 2026). **Status: Implementation awaiting Gate B acceptance;
+Gate A approved explicitly on 30 October 2026.** Owner approved content/date policy, timezone validation
+boundary, sold-out fixture deferral and started/past classification.
+Slice 1B remains unstarted.
+
+**Implementation evidence (30 October 2026):** all 15 approved manifest files
+delivered; 84 focused PostgreSQL tests passed; full regression 128 tests /
+575 assertions passed. PHP formatting, PHPStan, JS formatting/lint, TypeScript,
+asset build and diff checks passed. Exact commands, resolved intermediate
+failures, demo and remaining limitations are recorded in the slice plan.
+No persistent development database migration or seeding was performed.
+
+**Engineering result:** PostgreSQL contains a well-constrained, tested and
+repeatably seeded catalogue of events and ticket types. This foundation slice
+has **no new customer-visible page** and is intentionally separate from
+Laravel HTTP and React work.
 
 **In scope:**
 
-- Create `events` and `ticket_types` migrations/model relationships.
-- Implement deterministic seeders with original event identities, image
-  references/assets, venue descriptions, dates, local time zones, GA ticket
-  types, GBP minor-unit prices, capacities and some past/sold-out examples.
-- Add read-only server-routed Inertia event listing props; no independent API
-  or SPA routing framework.
-- Test seed replay, relationships, event grouping, time zones and ticket data.
+- Create the `events` and `ticket_types` migrations with precise columns,
+  foreign keys, uniqueness, checks and relevant indexes; define the event
+  schedule in UTC alongside an event-local IANA time zone.
+- Add lean Eloquent `Event` and `TicketType` models and their relationships.
+- Model one organizer's original event content, public venue details, image
+  references, one-off upcoming/past events and independently capped general-
+  admission ticket types; store GBP prices as integer minor units.
+- **Store `ticket_types.capacity` now** because capacity is a fundamental
+  property of a ticket type. Require positive capacity unless an explicitly
+  approved alternative is needed.
+- **Defer `reserved_count`, `confirmed_count`, inventory movements, hold locks
+  and oversell invariants to Slice 4.** They belong to the approved atomic
+  hold and payment-capacity design, and can be introduced by a dedicated
+  migration before any real purchases exist. Slice 1A must not invent paid
+  orders or pre-populate accounting counters to simulate sales.
+- Use deterministic, safely rerunnable seeders with meaningful original demo
+  data and factories where they make test setup easier. Seed replay must not
+  create duplicates or overwrite future customer transactions.
+- Test migrations/constraints, relationships, seed replay, price/currency,
+  event-local time zones, UTC schedules and event data against real PostgreSQL.
+- Explicitly resolve or flag the need for a **sold-out demo**: do not label
+  tickets sold out by inventing confirmed purchases without orders. If a
+  distinct sales-closed/unavailable state is needed for examples, propose its
+  semantics for approval rather than conflating it with sold-out accounting.
 
-**Exit evidence:** `migrate:fresh --seed` (in test/dev only) produces a
-representative event catalogue; event listing tests pass.
-**Forbidden:** Holds, Checkout, admin CRUD, Stripe, copied Luma data/assets.
+**Exit evidence:** On a disposable test PostgreSQL database, migrations and
+repeatable seeds produce the intended catalogue; exact database constraints,
+relationships and automated tests pass. Verify seed replay without a
+destructive migration against the persistent development database.
+
+**Forbidden:** Controllers, Form Requests, Inertia pages/props, React UI,
+orders, held/confirmed counters, capacity reservation logic, checkout, admin
+CRUD, Stripe, or copied Luma data/assets.
+
+## Slice 1B — Read-only Laravel/Inertia event integration
+
+**Customer-visible result:** A guest opens a simple public event listing and
+sees real upcoming/past events and ticket information supplied by Laravel
+from the seeded PostgreSQL database.
+
+**In scope:**
+
+- Add an invokable read-only Laravel controller and focused action/DTO
+  contracts only where they clarify the query-to-Inertia boundary; follow
+  the approved project rules without speculative repository/service layers.
+- Query and order upcoming/past events, including event-local date/time
+  labels, venue information, GA ticket type names, fixed prices and public
+  availability information that is actually supported by the current schema.
+- Return typed Inertia props and render a **minimal** React/TypeScript listing
+  using the current server-routed Inertia setup; no independent API or SPA
+  routing framework.
+- Test guest HTTP access, query ordering, time-zone display, server props,
+  TypeScript checks and a working read-only browser flow.
+- Avoid claiming precise remaining capacity or genuine sold-out inventory
+  until the authoritative reservation/confirmation accounting exists. Handle
+  unavailable or past events honestly; defer any unresolved sold-out
+  representation decision for the owner's approval.
+
+**Exit evidence:** Real events appear in the browser from PostgreSQL through
+Laravel and typed Inertia props, with focused HTTP/frontend tests passing.
+
+**Forbidden:** Polished calendar/hero/card design (Slice 2), hold or checkout
+mutations, inventory accounting, admin CRUD, Stripe or copied Luma assets.
 
 ## Slice 2 — The Luma-inspired event browsing page
 
@@ -281,4 +358,3 @@ Implementation acceptance and date:
 - The product owner's historical broad design decisions are consolidated in
   `V1_SPEC.md`; do not attempt to re-open v2 topics merely because the official
   Laravel starter kit includes them by default.
-
