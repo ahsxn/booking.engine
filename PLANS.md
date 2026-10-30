@@ -1,0 +1,284 @@
+# Ticketing v1 — vertical-slice implementation plan
+
+Status: **Proposed, no implementation approved.**
+
+**Operating rule:** every slice has **two distinct approvals**. First Codex
+inspects the current repository and proposes a detailed implementation plan
+without changing application code. The owner reviews and approves that plan.
+Then Codex implements only the approved design, demonstrates and tests it, and
+waits for owner acceptance before moving on. The product contract in
+`docs/V1_SPEC.md` always governs this plan; `AGENTS.md` defines the detailed
+approval and verification rules; `.ai/rules/` contains Laravel Boost project
+coding conventions, recorded from `docs/BOOST_PROJECT_RULES.md`. Use
+`docs/SLICE_PLAN_TEMPLATE.md` for every plan.
+
+## Pre-Slice 0 — Record and approve Laravel Boost project rules
+
+This is a **documentation-only setup gate**, before the first implementation
+plan; it does not authorize application code.
+
+1. In the owner's existing Laravel React/Inertia starter repository, inspect
+   the installed Laravel Boost configuration and preserve its generated
+   guideline block in `AGENTS.md`.
+2. Read `docs/BOOST_PROJECT_RULES.md`. Use Boost's `record-rule` MCP tool to
+   record the agreed application conventions under `.ai/rules/`, maintaining
+   its generated `index.md`. Do not manually copy these rules into a
+   Boost-managed index or replace the starter's `AGENTS.md`.
+3. Present the rule files, glob coverage and index for the owner's review.
+   Stop until the owner accepts the rules. Commit them with the other planning
+   docs; do not edit application code, scaffold, migrate or install packages.
+4. Only then ask Codex to plan Slice 0 using the current repository and the
+   approved project rules. Slice 0 still requires its own **Gate A** approval.
+
+## How to execute each slice
+
+1. **Plan-only pass:** inspect the repository and authoritative documents.
+   Create or revise `docs/slice-plans/NN-name.md` using the template. Specify
+   precise migrations, indexes, classes, responsibilities, action and DTO
+   contracts, controller/request flow, pages and props, transaction boundaries,
+   locking, retries/idempotency and tests as applicable. Include explicit
+   non-goals and uncertainties. No application code, scaffolding or dependency
+   changes at this stage.
+2. **Owner reviews Gate A:** challenge the classes, migration design, business
+   boundaries, tests and any abstractions; iterate on the plan until the owner
+   explicitly approves this slice's implementation plan.
+3. **Implement and verify:** build only the approved work, following the
+   applicable Laravel Boost `.ai/rules/` project rules and `AGENTS.md`.
+   Pause for approval before material
+   deviations, including schema, dependency, action-boundary, transaction or
+   idempotency changes. Show actual test outputs and a working vertical demo.
+4. **Owner reviews Gate B:** accept or request changes. Do not begin the next
+   slice until the current implementation has been accepted.
+
+The slices below are **roadmap scopes**, not pre-approved implementation
+designs. Their technical details are intentionally decided just in time, with
+visibility of the code produced by earlier slices.
+
+## Why vertical slices
+
+Each slice should produce a usable, reviewable part of the *actual* Laravel
+application, not a collection of isolated models or an unaudited giant build.
+Start with the visible event experience the owner wants, then develop atomic
+holds, the checkout shell, and a complete verified payment path. Reliability
+is tested from the first capacity-changing slice and hardened at each step.
+
+## Slice 0 — Audit and prepare the existing Laravel application
+
+**Customer-visible result:** The owner's existing Laravel React/Inertia
+application runs as a minimal, testable v1 foundation without an in-scope
+customer authentication workflow.
+
+**In scope:**
+
+- **Inspect and reuse the existing Git repository**, installed React/Inertia
+  starter kit, Laravel Boost integration, framework version and dependencies.
+  Do not create a second application or presume the starter is Laravel 13.
+- Propose the exact safe cleanup of unused starter authentication, settings,
+  dashboard and login/registration features, explaining each deletion or
+  retained dependency in the Slice 0 plan before touching code.
+- Audit the development environment; propose Docker Compose for PHP/Composer,
+  Node/Vite, PostgreSQL, web, queue worker and scheduler as needed, with
+  environment-example files and no actual secrets. Account for working
+  existing infrastructure rather than replacing it automatically.
+- Configure PostgreSQL for application and tests, unit/integration test runner,
+  formatting, TypeScript checking, JS build, and a documented dev start path.
+- Ensure Boost project rules, `AGENTS.md` and docs are tracked in the actual
+  Git repository without overwriting the Boost-generated guideline block.
+
+**Exit evidence:** From a clean environment, run the app, Inertia page, migrations,
+PostgreSQL connection, type check, asset build, and first test successfully.
+**Forbidden:** User accounts, admin pages, auth workflow, Redis or live Stripe.
+
+## Slice 1 — Seeded event domain and read-only data
+
+**Customer-visible result:** A server route returns usable upcoming/past event
+data with ticket prices and availability (even if styling is basic).
+
+**In scope:**
+
+- Create `events` and `ticket_types` migrations/model relationships.
+- Implement deterministic seeders with original event identities, image
+  references/assets, venue descriptions, dates, local time zones, GA ticket
+  types, GBP minor-unit prices, capacities and some past/sold-out examples.
+- Add read-only server-routed Inertia event listing props; no independent API
+  or SPA routing framework.
+- Test seed replay, relationships, event grouping, time zones and ticket data.
+
+**Exit evidence:** `migrate:fresh --seed` (in test/dev only) produces a
+representative event catalogue; event listing tests pass.
+**Forbidden:** Holds, Checkout, admin CRUD, Stripe, copied Luma data/assets.
+
+## Slice 2 — The Luma-inspired event browsing page
+
+**Customer-visible result:** A polished, responsive event calendar and
+Upcoming/Past event browsing page.
+
+**In scope:**
+
+- Recreate the *layout hierarchy and interactions* of
+  https://luma.com/venicebookclub: organizer hero/cover, calendar identity,
+  month navigation, Upcoming/Past switching, image-led event items/cards,
+  date, title, organizer, venue and ticket availability.
+- Use **original** brand, text, seeded events and visual assets. Avoid
+  reproducing protected Luma imagery, copy or branding.
+- Inertia/React TypeScript components with responsive desktop and mobile
+  layouts, keyboard/focus support, empty and sold-out states.
+- Human visual QA against fresh reference screenshots at desktop and mobile
+  sizes, plus interaction QA for month and status navigation.
+
+**Exit evidence:** Demo navigation on desktop/mobile; screenshots and tests for
+month boundaries, upcoming/past and correct event-local date labels.
+**Forbidden:** Building an admin panel or starting payment integration.
+
+## Slice 3 — Event detail and ticket selection
+
+**Customer-visible result:** Clicking an event opens its detailed page; users
+select multiple GA ticket types/quantities and see a server-priced GBP total.
+
+**In scope:**
+
+- Original event page hierarchy and layout inspired by the same browsing
+  reference: cover, title, event-local schedule, venue, description, ticket
+  selector and Available/Sold out indicators.
+- One-event selection, maximum 10 combined tickets, no exact availability
+  counts, accessible validation and navigation.
+- Read-only validation and total preview; no capacity guarantee until a
+  successful Checkout click in the next slice.
+
+**Exit evidence:** Demo selections, mobile views and validation tests.
+
+## Slice 4 — Atomic hold, pending order and checkout entry
+
+**Customer-visible result:** Clicking **Checkout** reserves selected tickets
+for 10 minutes, creates the pending order, then opens the timed checkout page.
+
+**In scope:**
+
+- `orders`, `order_items`, immutable price snapshots, unguessable checkout
+  capability and request-key uniqueness.
+- Transactional ticket counters, deterministic row locking, all-or-nothing
+  multi-type reservations, 10-minute hold, initial reference and exact expiry.
+- Same-checkout retry after network loss, conflicting-payload error, explicit
+  unstarted cancellation, expired-hold enforcement and release.
+- Concurrent PostgreSQL test harness *before* Stripe is introduced.
+- Checkout page shell showing ticket summary/reference/countdown, with no
+  enabled Pay action in this slice.
+
+**Exit evidence:** 1,000 competitors for 20 seats produces exactly 20 holds;
+duplicate keys, crash after commit, expiration and cancellation tests pass.
+**Forbidden:** Payment processing without protection, long database locks,
+  copying browser totals into orders.
+
+## Slice 5 — Buyer details and deferred Stripe Elements UI
+
+**Customer-visible result:** On a valid held checkout, customers can enter
+name, email and secure card details while the countdown runs.
+
+**In scope:**
+
+- Name/email validation on checkout, the Stripe Payment Element mounted in
+  deferred mode before a PaymentIntent exists, 3DS-capable card UI and error
+  presentation, accessible disabled/loading states.
+- Timer and server-expired state, same-tab refresh recovery, original order
+  reference and prices. No login/email or advanced anti-hoarding.
+- Non-charging client-side form validation; **Pay remains feature-gated** until
+  the next slice implements the complete trusted charge + webhook path.
+
+**Exit evidence:** Browser can validate customer/card fields and recover a
+hold after refresh without making any charge.
+
+## Slice 6 — Complete Stripe pay-to-confirm path
+
+**Customer-visible result:** A test-mode card payment succeeds and Stripe.js
+immediately shows payment success. A verified webhook job updates the
+**existing** order to confirmed.
+
+**In scope:**
+
+- `payment_attempts` with durable Stripe idempotency and one unresolved
+  payment path per order.
+- Commit buyer/protection state **before** Stripe API calls, create/reuse
+  PaymentIntent outside DB locks, persist Intent association before releasing
+  the client secret.
+- Stripe.js confirmation with 3DS support, immediate success and definite
+  decline handling; no duplicate Pay action while unknown.
+- Signed webhook endpoint, durable PostgreSQL queued job, worker, idempotent
+  transactional reserved-to-confirmed conversion, queue retries/failed jobs.
+- Deterministic Stripe fake tests plus test-mode happy-path and webhook tests.
+
+**Exit evidence:** One complete Stripe test purchase with expected DB order,
+protected capacity and confirmation; duplicate webhooks/Pay/crash tests pass.
+**Gate:** Do not enable public live charging; subsequent recovery slice is
+required before v1 is considered safe for real customers.
+
+## Slice 7 — Timeouts, abandonment and independent reconciliation
+
+**Customer-visible result:** Abandoned checkout capacity returns safely;
+payments with unknown outcomes do not prompt customers to pay twice.
+
+**In scope:**
+
+- Scheduled 1-minute expiry sweep, precise deadline on capacity access.
+- 15-minute normal protected payment window followed by Stripe status
+  resolution/safe cancellation. Preserve capacity on uncertainty.
+- Scheduled 1-minute payment reconciliation starting around 60 seconds after
+  uncertainty; backoff and idempotent confirmation, cancellation or release.
+- Retryable technical full refunds when an anomalous capture cannot be
+  fulfilled; durable refund ledger and fault injection.
+- Operational CLI inspection/reconcile commands and diagnostic logs.
+
+**Exit evidence:** All C, D, E and F failure tests in `ACCEPTANCE_TESTS.md` pass,
+including a missed webhook, repeated worker crash, Stripe outage and
+cancellation race. A human can reproduce these scenarios in dev.
+
+## Slice 8 — Adversarial verification, quality and handoff
+
+**Customer-visible result:** Final polished browse-to-payment flow is usable
+and behaves safely under fault injection.
+
+**In scope:**
+
+- Execute complete real-PostgreSQL concurrency suite, Stripe test-mode web
+  integration, 3DS, duplicate/out-of-order webhook and payment/refund recovery.
+- Independent adversarial review specifically hunting oversell, double charge,
+  false success and early release; fix and add regressions for each finding.
+- Responsive/accessibility polish, local bootstrap docs, health checks,
+  operations instructions, seed assets and clear v1 limitations.
+- Compile verification report: commands, exact outputs/results, measured
+  concurrency invariants, residual risks and future-scope exclusions.
+
+**Exit evidence:** All acceptance tests green, full dev demo, no unverified
+critical invariants, explicit product-owner acceptance. No deployment.
+
+## Slice tracking template
+
+For each slice maintain:
+
+```
+Slice: N / descriptive title
+Status: Not started | Planning | Plan awaiting approval | Plan approved |
+        Implementing | Implementation awaiting review | Accepted | Blocked
+Approved scope:
+Detailed plan document:
+Plan approval and date:
+Customer demo:
+Database/payment invariants touched:
+Tests to add before implementation:
+Verification commands and observed results:
+Known risks / deviation requests:
+Implementation acceptance and date:
+```
+
+## Planning issues to resolve before Slice 0
+
+- The original planning workspace was empty, but the owner has since reported
+  an existing Laravel React starter application with Laravel Boost installed.
+  Inspect that actual repository before planning changes; do not assume its
+  versions, database setup, existing classes or development tooling.
+- Confirm the architecture's exact schema indexes, global row-lock order, and
+  response-loss recovery approach in design review before implementing Slice
+  4. These are correctness prerequisites, not optional cleanup tasks.
+- The product owner's historical broad design decisions are consolidated in
+  `V1_SPEC.md`; do not attempt to re-open v2 topics merely because the official
+  Laravel starter kit includes them by default.
+

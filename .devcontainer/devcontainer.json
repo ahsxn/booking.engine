@@ -1,0 +1,53 @@
+{
+    "name": "Laravel + Inertia + React",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "lts"
+        },
+        "ghcr.io/devcontainers/features/docker-in-docker:4": {
+            "moby": false,
+            "dockerDashComposeVersion": "v2"
+        }
+    },
+    "containerEnv": {
+        "XDEBUG_MODE": "off"
+    },
+    "postCreateCommand": "composer global require laravel/installer && echo 'export PATH=\"$PATH:$(composer global config bin-dir --absolute)\"' >> ~/.bashrc",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "workbench.colorTheme": "GitHub Light High Contrast",
+                "window.zoomLevel": 2,
+                "editor.minimap.enabled": false,
+                "files.trimTrailingWhitespace": true,
+                "editor.renderWhitespace": "all",
+                "files.trimFinalNewlines": true,
+                "window.menuBarVisibility": "toggle",
+                "workbench.activityBar.location": "top",
+                "intelephense.environment.phpVersion": "8.5",
+                "editor.defaultFormatter": "esbenp.prettier-vscode",
+                "editor.formatOnSave": true
+            },
+            "extensions": [
+                "bmewburn.vscode-intelephense-client",
+                "laravel.vscode-laravel",
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "bradlc.vscode-tailwindcss",
+                "-devsense.composer-php-vscode",
+                "-devsense.intelli-php-vscode",
+                "-devsense.phptools-vscode",
+                "-devsense.profiler-php-vscode",
+                "-ms-azuretools.vscode-containers",
+                "-xdebug.php-debug",
+                "-xdebug.php-pack",
+                "-zobo.php-intellisense"
+            ]
+        }
+    },
+    "remoteUser": "vscode"
+}
