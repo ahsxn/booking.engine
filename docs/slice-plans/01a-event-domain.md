@@ -4,9 +4,9 @@
 
 - **Slice number and name:** 1A — Event domain and database.
 - **Roadmap reference:** `PLANS.md` → Slice 1A; Slice 1B is separate.
-- **Status:** Awaiting owner plan approval; revision 1, plan only.
+- **Status:** Awaiting implementation review / Gate B owner acceptance; approved revision 1 implemented.
 - **Proposed implementation owner/date:** Codex, principal engineer; 30 October 2026.
-- **Owner plan approval and date:** Pending.
+- **Owner plan approval and date:** Explicit Gate A approval, 30 October 2026; all four section 10 decisions approved.
 - **Implementation acceptance and date:** Pending.
 - **Related approved decisions:** Owner reports Slice 0 completed, verified, accepted and committed. Current instructions approve total ticket capacity in 1A and defer all inventory accounting to Slice 4. `V1_SPEC.md` governs requirements; architecture is a proposal except where explicitly approved. This plan does not approve the rest of that architecture.
 
@@ -24,20 +24,20 @@ Read completely: `AGENTS.md`, `PLANS.md`, `docs/V1_SPEC.md`, `docs/ARCHITECTURE.
 
 Read-only inspection on 30 October 2026 established:
 
-| Area | Actual repository/runtime |
-| --- | --- |
-| PHP and dependencies | PHP CLI 8.5.9; `composer show --direct`: Laravel 13.39.0, Boost 2.10.4, Pest 5.3.4, Pest Laravel plugin 5.0.1, Larastan 3.13.2, Pint 1.32.1, Faker 1.24.1; no dependency changes proposed |
-| Frontend packages | `package.json`: Inertia React/Vite ^3, React ^19.2, TypeScript ^5.7; irrelevant to this backend implementation |
-| Database | Boost schema/query: development PostgreSQL 17.11, database `laravel`, UTC session; nine infrastructure/migration tables, no event/ticket tables |
-| Isolated tests | Read-only query against existing `postgres-test`: PostgreSQL 17.11, database/role `laravel_test`, UTC. Compose uses tmpfs and host port 5433, distinct from persistent development PostgreSQL |
-| Migrations | Three `0001_01_01_*` migrations retain users/password-reset/sessions, cache/locks and jobs/batches/failed-jobs; do not change them |
-| Models/factories | Only dormant `app/Models/User.php` and `database/factories/UserFactory.php`; typed PHPDoc, `#[Fillable]`, `casts(): array`, factory generics and `fake()` provide relevant conventions; no event-domain pattern exists |
-| Seeds | `database/seeders/DatabaseSeeder.php` has empty `run(): void` and `WithoutModelEvents`; no user seeded |
-| Database config | `config/database.php` defaults to pgsql; `config/app.php` is UTC; pgsql config has no explicit session timezone override; runtime sessions observed UTC |
-| Test isolation | `phpunit.xml` pins pgsql/database/role and clears DB_URL; `tests/TestCase.php` rejects unsafe topology/configuration and verifies actual database/role before migration traits run |
-| Existing tests | `tests/Pest.php` binds Feature tests to TestCase. InfrastructureTest uses `DatabaseMigrations`, real queries, independent connection/process probes and named `test()` cases. No global refresh trait |
-| Checks/runtime | `compose.yml`, `.github/workflows/tests.yml`, `composer.json`, `package.json`, `phpstan.neon`: sequential test execution, PHPStan level 7, existing type/build/lint commands; preserve all |
-| Working tree | `PLANS.md` already contained an uncommitted owner-agreed 1A/1B roadmap split when planning began; preserve it. Latest inspected commit: `912a63d` |
+| Area                 | Actual repository/runtime                                                                                                                                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PHP and dependencies | PHP CLI 8.5.9; `composer show --direct`: Laravel 13.39.0, Boost 2.10.4, Pest 5.3.4, Pest Laravel plugin 5.0.1, Larastan 3.13.2, Pint 1.32.1, Faker 1.24.1; no dependency changes proposed                              |
+| Frontend packages    | `package.json`: Inertia React/Vite ^3, React ^19.2, TypeScript ^5.7; irrelevant to this backend implementation                                                                                                         |
+| Database             | Boost schema/query: development PostgreSQL 17.11, database `laravel`, UTC session; nine infrastructure/migration tables, no event/ticket tables                                                                        |
+| Isolated tests       | Read-only query against existing `postgres-test`: PostgreSQL 17.11, database/role `laravel_test`, UTC. Compose uses tmpfs and host port 5433, distinct from persistent development PostgreSQL                          |
+| Migrations           | Three `0001_01_01_*` migrations retain users/password-reset/sessions, cache/locks and jobs/batches/failed-jobs; do not change them                                                                                     |
+| Models/factories     | Only dormant `app/Models/User.php` and `database/factories/UserFactory.php`; typed PHPDoc, `#[Fillable]`, `casts(): array`, factory generics and `fake()` provide relevant conventions; no event-domain pattern exists |
+| Seeds                | `database/seeders/DatabaseSeeder.php` has empty `run(): void` and `WithoutModelEvents`; no user seeded                                                                                                                 |
+| Database config      | `config/database.php` defaults to pgsql; `config/app.php` is UTC; pgsql config has no explicit session timezone override; runtime sessions observed UTC                                                                |
+| Test isolation       | `phpunit.xml` pins pgsql/database/role and clears DB_URL; `tests/TestCase.php` rejects unsafe topology/configuration and verifies actual database/role before migration traits run                                     |
+| Existing tests       | `tests/Pest.php` binds Feature tests to TestCase. InfrastructureTest uses `DatabaseMigrations`, real queries, independent connection/process probes and named `test()` cases. No global refresh trait                  |
+| Checks/runtime       | `compose.yml`, `.github/workflows/tests.yml`, `composer.json`, `package.json`, `phpstan.neon`: sequential test execution, PHPStan level 7, existing type/build/lint commands; preserve all                             |
+| Working tree         | `PLANS.md` already contained an uncommitted owner-agreed 1A/1B roadmap split when planning began; preserve it. Latest inspected commit: `912a63d`                                                                      |
 
 Boost version-scoped documentation was consulted for migrations, timestampTz, Eloquent date casts, relationships, factories and database testing. No tests, migrations or seeders were run during this planning pass. Older status headings in the design and Slice 0 document are historical; the owner's present Slice 0 acceptance instruction governs. Those documents are outside this edit scope.
 
@@ -45,23 +45,23 @@ Boost version-scoped documentation was consulted for migrations, timestampTz, El
 
 The following is the complete proposed implementation manifest. Only the two documentation rows are changed during this planning task. No files are removed.
 
-| Path | Add/change | Responsibility / why needed |
-| --- | --- | --- |
-| `app/Models/Event.php` | Add | Lean event persistence, schedule casts, timezone assignment validation and ticket relationship |
-| `app/Models/TicketType.php` | Add | Lean ticket persistence, integer casts and parent relationship |
-| `database/migrations/2026_10_30_000100_create_events_table.php` | Add | Events schema and PostgreSQL constraints/indexes below |
-| `database/migrations/2026_10_30_000200_create_ticket_types_table.php` | Add | Ticket schema and PostgreSQL constraints/indexes below |
-| `database/factories/EventFactory.php` | Add | Valid event fixtures with explicit upcoming/past states |
-| `database/factories/TicketTypeFactory.php` | Add | Valid independently capped, paid GBP fixtures with parent factory |
-| `database/seeders/EventSeeder.php` | Add | Fixed original catalogue and original cover data, insert missing events only |
-| `database/seeders/TicketTypeSeeder.php` | Add | Fixed ticket definitions keyed by event slug and stable ticket code |
-| `database/seeders/DatabaseSeeder.php` | Change | One transaction calling EventSeeder then TicketTypeSeeder; retain no-account behavior and WithoutModelEvents |
-| `tests/Feature/EventSchemaTest.php` | Add | Migration replay, column/index contract and direct-SQL constraint behavior |
-| `tests/Feature/Models/EventTest.php` | Add | Event relations, timezone assignment and UTC/local instant behavior |
-| `tests/Feature/Models/TicketTypeTest.php` | Add | Parent identity and integer price/capacity behavior |
-| `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Add | Exact seeded catalogue, replay, preservation and rollback evidence |
-| `PLANS.md` | Change | Link proposal/status now; later record this slice's approvals/review status only |
-| `docs/slice-plans/01a-event-domain.md` | Add, later change | This plan and actual Gate A/Gate B records |
+| Path                                                                  | Add/change        | Responsibility / why needed                                                                                  |
+| --------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| `app/Models/Event.php`                                                | Add               | Lean event persistence, schedule casts, timezone assignment validation and ticket relationship               |
+| `app/Models/TicketType.php`                                           | Add               | Lean ticket persistence, integer casts and parent relationship                                               |
+| `database/migrations/2026_10_30_000100_create_events_table.php`       | Add               | Events schema and PostgreSQL constraints/indexes below                                                       |
+| `database/migrations/2026_10_30_000200_create_ticket_types_table.php` | Add               | Ticket schema and PostgreSQL constraints/indexes below                                                       |
+| `database/factories/EventFactory.php`                                 | Add               | Valid event fixtures with explicit upcoming/past states                                                      |
+| `database/factories/TicketTypeFactory.php`                            | Add               | Valid independently capped, paid GBP fixtures with parent factory                                            |
+| `database/seeders/EventSeeder.php`                                    | Add               | Fixed original catalogue and original cover data, insert missing events only                                 |
+| `database/seeders/TicketTypeSeeder.php`                               | Add               | Fixed ticket definitions keyed by event slug and stable ticket code                                          |
+| `database/seeders/DatabaseSeeder.php`                                 | Change            | One transaction calling EventSeeder then TicketTypeSeeder; retain no-account behavior and WithoutModelEvents |
+| `tests/Feature/EventSchemaTest.php`                                   | Add               | Migration replay, column/index contract and direct-SQL constraint behavior                                   |
+| `tests/Feature/Models/EventTest.php`                                  | Add               | Event relations, timezone assignment and UTC/local instant behavior                                          |
+| `tests/Feature/Models/TicketTypeTest.php`                             | Add               | Parent identity and integer price/capacity behavior                                                          |
+| `tests/Feature/Database/Seeders/DatabaseSeederTest.php`               | Add               | Exact seeded catalogue, replay, preservation and rollback evidence                                           |
+| `PLANS.md`                                                            | Change            | Link proposal/status now; later record this slice's approvals/review status only                             |
+| `docs/slice-plans/01a-event-domain.md`                                | Add, later change | This plan and actual Gate A/Gate B records                                                                   |
 
 **Client/dev tooling:** not applicable; no source, config, dependency, CI, test guard or runtime changes. Test directories above are under the existing `tests/Feature` root. Generate PHP files with Artisan after approval; pin migration filenames to the manifest after generation so event migration precedes ticket migration. Inspect generated output before filling it; retain no extra generated controller/request/test/seed scaffolding. Use `make:test --pest EventSchemaTest` etc. without a `Feature/` prefix, then move model/seeder tests into the listed subdirectories.
 
@@ -69,16 +69,16 @@ The following is the complete proposed implementation manifest. Only the two doc
 
 All classes below are proposed technical recommendations, subject to Gate A. Existing inherited framework APIs remain available; no new business action API is introduced.
 
-| Fully qualified class | File | Responsibility and methods | Inputs → outputs / side effects | Dependencies |
-| --- | --- | --- | --- | --- |
-| `App\Models\Event` | `app/Models/Event.php` | `ticketTypes(): HasMany`; protected `casts(): array`; protected `timezone(): Attribute` mutator | Relationship yields only this event's tickets, ordered `display_order`, then `id`. Immutable datetime casts for starts/ends/created/updated. Timezone assignment accepts an exact PHP IANA identifier or `UTC`, otherwise throws `InvalidArgumentException` before persistence | Eloquent Model, Attribute, HasFactory<EventFactory>, HasMany; native DateTimeZone |
-| `App\Models\TicketType` | `app/Models/TicketType.php` | `event(): BelongsTo`; protected `casts(): array` | Parent event; integer casts for price_minor, capacity and display_order. No remaining-capacity or sold-out method | Eloquent Model, HasFactory<TicketTypeFactory>, BelongsTo |
-| `Database\Factories\EventFactory` | `database/factories/EventFactory.php` | `definition(): array`, `upcoming(): static`, `past(): static` | Valid complete attributes; unique slug, original placeholder content and cover; base schedule fixed, states relative to controlled test clock | Factory<Event>, Faker, CarbonImmutable |
-| `Database\Factories\TicketTypeFactory` | `database/factories/TicketTypeFactory.php` | `definition(): array` | Valid attributes: parent Event factory, unique code, GA name, positive integer price and capacity, GBP, display order | Factory<TicketType>, Event factory, Faker |
-| `Database\Seeders\EventSeeder` | `database/seeders/EventSeeder.php` | `run(): void` | No arguments; firstOrCreate by exact slug using fixed attributes; no existing-row updates | Seeder, Event, literal seed definitions |
-| `Database\Seeders\TicketTypeSeeder` | `database/seeders/TicketTypeSeeder.php` | `run(): void` | No arguments; require each declared event slug to exist (firstOrFail); firstOrCreate by event_id + code; no existing-row updates | Seeder, Event, TicketType, literal ticket definitions |
-| `Database\Seeders\DatabaseSeeder` | `database/seeders/DatabaseSeeder.php` | `run(): void` | No arguments; DB::transaction invokes the two child seeders in order, attempts: 3; exception propagates after rollback | Existing Seeder/WithoutModelEvents, DB, child seeders |
-| Anonymous migration extending `Illuminate\Database\Migrations\Migration` (one per migration file) | Two migration paths above | `up(): void`, `down(): void` | Create/drop only the respective table, with ticket table dropped before events on rollback | Schema, Blueprint, DB for named CHECK statements |
+| Fully qualified class                                                                             | File                                       | Responsibility and methods                                                                      | Inputs → outputs / side effects                                                                                                                                                                                                                                                | Dependencies                                                                      |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| `App\Models\Event`                                                                                | `app/Models/Event.php`                     | `ticketTypes(): HasMany`; protected `casts(): array`; protected `timezone(): Attribute` mutator | Relationship yields only this event's tickets, ordered `display_order`, then `id`. Immutable datetime casts for starts/ends/created/updated. Timezone assignment accepts an exact PHP IANA identifier or `UTC`, otherwise throws `InvalidArgumentException` before persistence | Eloquent Model, Attribute, HasFactory<EventFactory>, HasMany; native DateTimeZone |
+| `App\Models\TicketType`                                                                           | `app/Models/TicketType.php`                | `event(): BelongsTo`; protected `casts(): array`                                                | Parent event; integer casts for price_minor, capacity and display_order. No remaining-capacity or sold-out method                                                                                                                                                              | Eloquent Model, HasFactory<TicketTypeFactory>, BelongsTo                          |
+| `Database\Factories\EventFactory`                                                                 | `database/factories/EventFactory.php`      | `definition(): array`, `upcoming(): static`, `past(): static`                                   | Valid complete attributes; unique slug, original placeholder content and cover; base schedule fixed, states relative to controlled test clock                                                                                                                                  | Factory<Event>, Faker, CarbonImmutable                                            |
+| `Database\Factories\TicketTypeFactory`                                                            | `database/factories/TicketTypeFactory.php` | `definition(): array`                                                                           | Valid attributes: parent Event factory, unique code, GA name, positive integer price and capacity, GBP, display order                                                                                                                                                          | Factory<TicketType>, Event factory, Faker                                         |
+| `Database\Seeders\EventSeeder`                                                                    | `database/seeders/EventSeeder.php`         | `run(): void`                                                                                   | No arguments; firstOrCreate by exact slug using fixed attributes; no existing-row updates                                                                                                                                                                                      | Seeder, Event, literal seed definitions                                           |
+| `Database\Seeders\TicketTypeSeeder`                                                               | `database/seeders/TicketTypeSeeder.php`    | `run(): void`                                                                                   | No arguments; require each declared event slug to exist (firstOrFail); firstOrCreate by event_id + code; no existing-row updates                                                                                                                                               | Seeder, Event, TicketType, literal ticket definitions                             |
+| `Database\Seeders\DatabaseSeeder`                                                                 | `database/seeders/DatabaseSeeder.php`      | `run(): void`                                                                                   | No arguments; DB::transaction invokes the two child seeders in order, attempts: 3; exception propagates after rollback                                                                                                                                                         | Existing Seeder/WithoutModelEvents, DB, child seeders                             |
+| Anonymous migration extending `Illuminate\Database\Migrations\Migration` (one per migration file) | Two migration paths above                  | `up(): void`, `down(): void`                                                                    | Create/drop only the respective table, with ticket table dropped before events on rollback                                                                                                                                                                                     | Schema, Blueprint, DB for named CHECK statements                                  |
 
 Use explicit fillable catalogue fields following the existing attribute convention, typed properties/PHPDoc and generic relationships/factories. IDs and timestamps are not fillable. No model observers, saving hooks, service provider changes, repository, DTO, value object, event-status enum, domain framework or custom cast. The timezone mutator is simple scalar validation and still applies with `WithoutModelEvents`; a saving hook would not.
 
@@ -96,31 +96,31 @@ All specifications below are **proposed** for Gate A. Exactly two new tables; no
 
 ### Events — `2026_10_30_000100_create_events_table.php`
 
-| Column | Exact PostgreSQL type | Nullable | Default | Purpose |
-| --- | --- | --- | --- | --- |
-| id | bigint, sequence-backed (`bigserial` from Laravel id()) | No | generated sequence value | Primary identity; not an authorization secret |
-| slug | varchar(160) | No | None | Stable lowercase public identity/seed key |
-| title | varchar(255) | No | None | Event title |
-| description | text | No | None | Original plain text; no rich-HTML contract |
-| organizer_name | varchar(120) | No | None | Display attribution for the one v1 organizer; no account/organizer relation |
-| cover_image_url | text | No | None | Original cover reference; seed with self-contained SVG data URL |
-| venue_name | varchar(255) | No | None | Public venue name |
-| venue_address | text | No | None | Public human-readable address; no maps/coordinates/private address state |
-| timezone | varchar(64) | No | None | Event-local IANA identifier, separate from instant storage |
-| starts_at | timestamp(0) with time zone | No | None | UTC instant, second precision |
-| ends_at | timestamp(0) with time zone | No | None | UTC instant, strictly after start |
-| created_at | timestamp(0) with time zone | Yes | None | Eloquent-managed audit time |
-| updated_at | timestamp(0) with time zone | Yes | None | Eloquent-managed audit time |
+| Column          | Exact PostgreSQL type                                   | Nullable | Default                  | Purpose                                                                     |
+| --------------- | ------------------------------------------------------- | -------- | ------------------------ | --------------------------------------------------------------------------- |
+| id              | bigint, sequence-backed (`bigserial` from Laravel id()) | No       | generated sequence value | Primary identity; not an authorization secret                               |
+| slug            | varchar(160)                                            | No       | None                     | Stable lowercase public identity/seed key                                   |
+| title           | varchar(255)                                            | No       | None                     | Event title                                                                 |
+| description     | text                                                    | No       | None                     | Original plain text; no rich-HTML contract                                  |
+| organizer_name  | varchar(120)                                            | No       | None                     | Display attribution for the one v1 organizer; no account/organizer relation |
+| cover_image_url | text                                                    | No       | None                     | Original cover reference; seed with self-contained SVG data URL             |
+| venue_name      | varchar(255)                                            | No       | None                     | Public venue name                                                           |
+| venue_address   | text                                                    | No       | None                     | Public human-readable address; no maps/coordinates/private address state    |
+| timezone        | varchar(64)                                             | No       | None                     | Event-local IANA identifier, separate from instant storage                  |
+| starts_at       | timestamp(0) with time zone                             | No       | None                     | UTC instant, second precision                                               |
+| ends_at         | timestamp(0) with time zone                             | No       | None                     | UTC instant, strictly after start                                           |
+| created_at      | timestamp(0) with time zone                             | Yes      | None                     | Eloquent-managed audit time                                                 |
+| updated_at      | timestamp(0) with time zone                             | Yes      | None                     | Eloquent-managed audit time                                                 |
 
 Keys/indexes (B-tree): `events_pkey` on id; unique `events_slug_unique` on slug; non-unique `events_starts_at_id_index` on (starts_at, id), supporting future schedule range/order scans with a tie-breaker. No foreign keys. No index on description, address, timezone or ends_at without a demonstrated query need.
 
 Named checks:
 
-| Constraint | Predicate / guarantee |
-| --- | --- |
-| events_slug_format_check | `slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`; nonempty, canonical case, case-variant duplicate avoided without citext |
+| Constraint                 | Predicate / guarantee                                                                                                                                                                                                                  |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| events_slug_format_check   | `slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`; nonempty, canonical case, case-variant duplicate avoided without citext                                                                                                                           |
 | events_required_text_check | `btrim(title) <> '' AND btrim(description) <> '' AND btrim(organizer_name) <> '' AND btrim(cover_image_url) <> '' AND btrim(venue_name) <> '' AND btrim(venue_address) <> '' AND btrim(timezone) <> ''`; blocks blank required content |
-| events_schedule_check | `isfinite(starts_at) AND isfinite(ends_at) AND ends_at > starts_at`; blocks equal/reversed/non-finite schedules |
+| events_schedule_check      | `isfinite(starts_at) AND isfinite(ends_at) AND ends_at > starts_at`; blocks equal/reversed/non-finite schedules                                                                                                                        |
 
 No stored upcoming/past flag or recurrence: each row is one occurrence. Proposed boundary for future consumers/tests: upcoming means `starts_at > reference_now`; past/started means `starts_at <= reference_now`, including in-progress events. This matches the no-new-hold-at-start cutoff but does not implement it. If product wants in-progress represented separately, decide in Slice 1B; do not silently change this proposal.
 
@@ -130,19 +130,19 @@ No stored upcoming/past flag or recurrence: each row is one occurrence. Proposed
 
 ### Ticket types — `2026_10_30_000200_create_ticket_types_table.php`
 
-| Column | Exact PostgreSQL type | Nullable | Default | Purpose |
-| --- | --- | --- | --- | --- |
-| id | bigint, sequence-backed (`bigserial`) | No | generated sequence value | Primary identity |
-| event_id | bigint | No | None | Parent event |
-| code | varchar(64) | No | None | Stable per-event seed identity independent of editable name |
-| name | varchar(120) | No | None | GA ticket display name |
-| description | text | Yes | None | Optional explanation of pricing; no seating entitlement |
-| display_order | integer | No | 0 | Nonnegative display position; ties allowed, resolved by id |
-| price_minor | integer | No | None | Positive GBP pence; never floating-point pounds |
-| currency | varchar(3) | No | 'GBP' | Explicit currency for later snapshot boundaries |
-| capacity | integer | No | None | Positive total allocation of this ticket type, independently capped |
-| created_at | timestamp(0) with time zone | Yes | None | Eloquent-managed |
-| updated_at | timestamp(0) with time zone | Yes | None | Eloquent-managed |
+| Column        | Exact PostgreSQL type                 | Nullable | Default                  | Purpose                                                             |
+| ------------- | ------------------------------------- | -------- | ------------------------ | ------------------------------------------------------------------- |
+| id            | bigint, sequence-backed (`bigserial`) | No       | generated sequence value | Primary identity                                                    |
+| event_id      | bigint                                | No       | None                     | Parent event                                                        |
+| code          | varchar(64)                           | No       | None                     | Stable per-event seed identity independent of editable name         |
+| name          | varchar(120)                          | No       | None                     | GA ticket display name                                              |
+| description   | text                                  | Yes      | None                     | Optional explanation of pricing; no seating entitlement             |
+| display_order | integer                               | No       | 0                        | Nonnegative display position; ties allowed, resolved by id          |
+| price_minor   | integer                               | No       | None                     | Positive GBP pence; never floating-point pounds                     |
+| currency      | varchar(3)                            | No       | 'GBP'                    | Explicit currency for later snapshot boundaries                     |
+| capacity      | integer                               | No       | None                     | Positive total allocation of this ticket type, independently capped |
+| created_at    | timestamp(0) with time zone           | Yes      | None                     | Eloquent-managed                                                    |
+| updated_at    | timestamp(0) with time zone           | Yes      | None                     | Eloquent-managed                                                    |
 
 Keys/indexes (B-tree): `ticket_types_pkey`; unique `ticket_types_event_id_code_unique` on (event_id, code); non-unique `ticket_types_event_id_display_order_id_index` on (event_id, display_order, id). No extra event_id-only index because both composite indexes lead with it. No name uniqueness: ticket labels may repeat; stable code identifies a seeded definition. No uniqueness on display_order so inserting/reordering does not require renumbering peers.
 
@@ -150,14 +150,14 @@ Foreign key `ticket_types_event_id_foreign`: event_id → events.id, **ON DELETE
 
 Named checks:
 
-| Constraint | Predicate / guarantee |
-| --- | --- |
-| ticket_types_code_format_check | `code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'` |
-| ticket_types_name_check | `btrim(name) <> ''` |
-| ticket_types_display_order_check | `display_order >= 0` |
-| ticket_types_price_minor_check | `price_minor > 0`; free tickets excluded by v1 |
-| ticket_types_currency_check | `currency = 'GBP'`; reject lowercase and other currencies |
-| ticket_types_capacity_check | `capacity > 0`; zero is not a sold-out marker |
+| Constraint                       | Predicate / guarantee                                     |
+| -------------------------------- | --------------------------------------------------------- |
+| ticket_types_code_format_check   | `code ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`                       |
+| ticket_types_name_check          | `btrim(name) <> ''`                                       |
+| ticket_types_display_order_check | `display_order >= 0`                                      |
+| ticket_types_price_minor_check   | `price_minor > 0`; free tickets excluded by v1            |
+| ticket_types_currency_check      | `currency = 'GBP'`; reject lowercase and other currencies |
+| ticket_types_capacity_check      | `capacity > 0`; zero is not a sold-out marker             |
 
 Integer range is 1..2,147,483,647 for price/capacity, 0..2,147,483,647 for ordering. This technical representation limit is not a new sale policy. SQL inserts must bind minor units as integers; models/factories/seeders do not accept decimal pounds. PostgreSQL numeric coercion is not a substitute for future request validation.
 
@@ -183,29 +183,29 @@ Use literal identities and absolute UTC schedules, never now() offsets or Faker 
 
 Rerunning after committed success leaves the full rows, IDs and audit timestamps unchanged; rerunning after pre-commit failure inserts the missing catalogue once. If an operator intentionally changes an event slug or ticket code, the old seed identity is absent and replay would create it again. Treat those keys as operationally immutable; changing seed identities or applying content corrections requires an explicit future data-change decision. Existing-row preservation means replay does not repair operator edits automatically. It does repair a missing ticket under a still-present event. The seed transaction is atomic; numeric sequences may have gaps after rollback, which is acceptable.
 
-### Exact proposed catalogue (requires owner content approval)
+### Exact catalogue (owner approved at Gate A)
 
 All four events belong to original organizer **Margin & Lantern**, stored as organizer_name on each event. No user/organizer account is created. These are fictional demonstration gatherings at public venues, not announcements of actual venue bookings.
 
-| Slug / title | Original description | Public venue/address | IANA zone | UTC start → end |
-| --- | --- | --- | --- | --- |
-| paper-trails / Paper Trails: An Autumn Reading Circle | Bring a short passage about a journey and join a relaxed conversation about the places books carry us. | Barbican Centre; Silk Street, London EC2Y 8DS, United Kingdom | Europe/London | 2026-09-19 13:00:00Z → 15:00:00Z |
-| city-in-the-margins / The City in the Margins | Explore how overlooked streets become memorable settings, then trade reading recommendations over a guided discussion. | Manchester Central Library; St Peter's Square, Manchester M2 5PD, United Kingdom | Europe/London | 2026-10-17 13:00:00Z → 15:00:00Z |
-| lantern-pages / Lantern Pages: Stories After Dusk | Share an evening of short fiction and discuss how writers build atmosphere with light, silence and surprise. | The British Library; 96 Euston Road, London NW1 2DB, United Kingdom | Europe/London | 2026-11-14 18:00:00Z → 20:00:00Z |
-| new-year-new-chapter / A New Year, A New Chapter | Gather for a fresh reading season, compare discoveries and choose a personal reading challenge for the months ahead. | Central Library Oodi; Töölönlahdenkatu 4, 00100 Helsinki, Finland | Europe/Helsinki | 2027-01-16 12:00:00Z → 14:00:00Z |
+| Slug / title                                          | Original description                                                                                                   | Public venue/address                                                             | IANA zone       | UTC start → end                  |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------- | -------------------------------- |
+| paper-trails / Paper Trails: An Autumn Reading Circle | Bring a short passage about a journey and join a relaxed conversation about the places books carry us.                 | Barbican Centre; Silk Street, London EC2Y 8DS, United Kingdom                    | Europe/London   | 2026-09-19 13:00:00Z → 15:00:00Z |
+| city-in-the-margins / The City in the Margins         | Explore how overlooked streets become memorable settings, then trade reading recommendations over a guided discussion. | Manchester Central Library; St Peter's Square, Manchester M2 5PD, United Kingdom | Europe/London   | 2026-10-17 13:00:00Z → 15:00:00Z |
+| lantern-pages / Lantern Pages: Stories After Dusk     | Share an evening of short fiction and discuss how writers build atmosphere with light, silence and surprise.           | The British Library; 96 Euston Road, London NW1 2DB, United Kingdom              | Europe/London   | 2026-11-14 18:00:00Z → 20:00:00Z |
+| new-year-new-chapter / A New Year, A New Chapter      | Gather for a fresh reading season, compare discoveries and choose a personal reading challenge for the months ahead.   | Central Library Oodi; Töölönlahdenkatu 4, 00100 Helsinki, Finland                | Europe/Helsinki | 2027-01-16 12:00:00Z → 14:00:00Z |
 
 Each event has two independently capped GA definitions (no reserved seating or special admission privileges):
 
-| Event slug | code / name | Description | display_order | GBP price_minor | capacity |
-| --- | --- | --- | --- | --- | --- |
-| paper-trails | standard-ga / General admission | Admission to the reading circle. | 0 | 1200 | 30 |
-| paper-trails | supporter-ga / Supporter admission | The same admission at a voluntary supporter price. | 1 | 1800 | 10 |
-| city-in-the-margins | standard-ga / General admission | Admission to the discussion. | 0 | 1000 | 24 |
-| city-in-the-margins | supporter-ga / Supporter admission | The same admission at a voluntary supporter price. | 1 | 1600 | 8 |
-| lantern-pages | standard-ga / General admission | Admission to the story evening. | 0 | 1500 | 40 |
-| lantern-pages | supporter-ga / Supporter admission | The same admission at a voluntary supporter price. | 1 | 2200 | 12 |
-| new-year-new-chapter | standard-ga / General admission | Admission to the reading gathering. | 0 | 1400 | 28 |
-| new-year-new-chapter | supporter-ga / Supporter admission | The same admission at a voluntary supporter price. | 1 | 2000 | 8 |
+| Event slug           | code / name                        | Description                                        | display_order | GBP price_minor | capacity |
+| -------------------- | ---------------------------------- | -------------------------------------------------- | ------------- | --------------- | -------- |
+| paper-trails         | standard-ga / General admission    | Admission to the reading circle.                   | 0             | 1200            | 30       |
+| paper-trails         | supporter-ga / Supporter admission | The same admission at a voluntary supporter price. | 1             | 1800            | 10       |
+| city-in-the-margins  | standard-ga / General admission    | Admission to the discussion.                       | 0             | 1000            | 24       |
+| city-in-the-margins  | supporter-ga / Supporter admission | The same admission at a voluntary supporter price. | 1             | 1600            | 8        |
+| lantern-pages        | standard-ga / General admission    | Admission to the story evening.                    | 0             | 1500            | 40       |
+| lantern-pages        | supporter-ga / Supporter admission | The same admission at a voluntary supporter price. | 1             | 2200            | 12       |
+| new-year-new-chapter | standard-ga / General admission    | Admission to the reading gathering.                | 0             | 1400            | 28       |
+| new-year-new-chapter | supporter-ga / Supporter admission | The same admission at a voluntary supporter price. | 1             | 2000            | 8        |
 
 Cover references are self-contained `data:image/svg+xml;base64,...` URLs from original literal static SVG markup in EventSeeder: four abstract book/lantern compositions with distinct colors, no scripts, external links, embedded third-party art or copied Luma material. No image files, asset generator, network request or frontend styling work. Exact vector drawing details are routine implementation within that content contract. A later approved visual slice can replace references with original asset paths; replay will preserve existing rows rather than silently replace their covers.
 
@@ -221,32 +221,32 @@ All new tests are Pest **Feature/database tests** using existing `Tests\TestCase
 
 Use `test()` consistently, named datasets for invalid values, factories per test and real writes. For constraint failures assert `QueryException` plus PostgreSQL SQLSTATE/constraint identity; then assert no invalid row committed. Each expected failed statement runs in its own explicit transaction/savepoint and is rolled back before subsequent queries, avoiding PostgreSQL's aborted-transaction state. Do not assert brittle whole error messages. Direct query-builder writes intentionally bypass model checks to exercise database protections. No row fixture in global beforeEach; freeze only tests that depend on time and restore via travelBack in afterEach.
 
-| Scenario / proposed test name | Exact file | Setup / assertion |
-| --- | --- | --- |
-| creates the event catalogue on isolated PostgreSQL | `tests/Feature/EventSchemaTest.php` | Guard + DatabaseMigrations; assert live identity/UTC; information_schema verifies listed column types, nullability, defaults and timestamptz precision; pg_catalog verifies named keys/checks/FK/index column order and restrictive actions. Insert valid parent/child and verify persistence |
-| reverses and reapplies only the event domain migrations | `tests/Feature/EventSchemaTest.php` | Within isolated test harness, require the two migration objects, down ticket then event; assert domain tables absent and existing users/jobs tables retained; up event then ticket, insert valid rows and assert constraints work. No standalone migrate:fresh CLI command |
-| rejects missing required catalogue values | `tests/Feature/EventSchemaTest.php` | Dataset null in each nonnullable non-generated field for both tables; SQLSTATE 23502. Omit fields with defaults in valid test; assert GBP/display_order defaults; nullable description/audit fields accepted |
-| rejects malformed event identities and blank content | `tests/Feature/EventSchemaTest.php` | Empty/uppercase/space-bearing slug; whitespace-only required text fields including timezone/cover; SQLSTATE 23514 and respective constraint |
-| keeps event slugs unique | `tests/Feature/EventSchemaTest.php` | Two rows same slug rejected, 23505; different slug accepted |
-| requires finite events ending after their start | `tests/Feature/EventSchemaTest.php` | Equal/reversed start/end; +/-infinity bounds via direct SQL rejected, 23514. Positive one-second duration and overnight interval accepted; no future-only constraint |
-| requires ticket ownership and preserves populated events | `tests/Feature/EventSchemaTest.php` | Orphan event_id insert rejected, 23503; parent delete and referenced PK update rejected, 23503; parent and ticket remain intact |
-| keeps ticket codes unique within their event | `tests/Feature/EventSchemaTest.php` | Duplicate event_id/code rejected 23505; same code under second event allowed; same name allowed; malformed code and blank name rejected 23514 |
-| requires positive total ticket capacity | `tests/Feature/EventSchemaTest.php` | Raw insert/update dataset 0/-1 rejected 23514, null 23502; 1 and 2,147,483,647 accepted; 2,147,483,648 rejected 22003. Failed update preserves old capacity. No counter created/tested |
-| stores only paid GBP minor-unit prices | `tests/Feature/EventSchemaTest.php` | 1/1250/max integer accepted; 0/-1 rejected 23514, null 23502, overflow 22003; EUR/USD/gbp rejected 23514. No float arithmetic or currency conversion |
-| permits display ties but rejects negative ordering | `tests/Feature/EventSchemaTest.php` | Same event/order accepted; 0 accepted, -1 rejected 23514; optional ticket description null accepted |
-| returns only an event's tickets in stable display order | `tests/Feature/Models/EventTest.php` | Two events with tickets, ties/inverse insertion order; relation yields exactly matching IDs ordered display_order/id, never the second event's tickets |
-| accepts IANA identifiers and rejects abbreviations and offsets | `tests/Feature/Models/EventTest.php` | Event create/update through assignment: Europe/London, Europe/Helsinki, America/New_York, UTC accepted; BST, +01:00, Mars/Olympus, whitespace rejected with InvalidArgumentException before DB write. Repeat through DatabaseSeeder with WithoutModelEvents to prove supported write path |
-| preserves UTC instants while displaying event-local time | `tests/Feature/Models/EventTest.php` | Explicit known UTC winter/summer London dates → known local times/offsets, Helsinki January conversion; immutable casts/UTC ISO serialization and unchanged refreshed stored instants. Direct SQL offset input `2026-07-18 14:00:00+01` reads as `13:00:00+00` |
-| keeps distinct instants across an autumn clock change | `tests/Feature/Models/EventTest.php` | London `2026-10-25T00:30:00Z` → 01:30 +01; `01:30:00Z` → 01:30 +00. Persist a valid interval, verify ordering by instants despite repeated wall time; no ambiguous-local-input parser introduced |
-| belongs to its exact event | `tests/Feature/Models/TicketTypeTest.php` | Factory::for event, assert parent identity and relationship persistence; no unrelated parent returned |
-| returns integer pence and independent total capacities | `tests/Feature/Models/TicketTypeTest.php` | Two types same parent with 1250/2000 pence and capacities 3/7; refresh asserts PHP integers/exact values and GBP; changing one type's capacity does not alter its sibling or create event capacity |
-| seeds the exact original catalogue without accounts or sales | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Seed empty DB, assert exactly 4 events/8 tickets, all literal identities/fields/prices/caps from section 7, single organizer name, valid original cover data URLs, no external image links; zero users/jobs; no orders/payment/counter schema |
-| repeats seeds without changing identities or existing values | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Freeze initial clock, seed; capture all rows including IDs/timestamps; advance time, seed again; exact full-row equality, 4/8 counts |
-| preserves edits and unrelated records on replay | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Change seeded title, venue, ticket name, price and positive capacity; add unrelated factory event/ticket; rerun; all edits/IDs/timestamps preserved, no duplicate from ticket name change, unrelated records unchanged |
-| restores only a missing seeded ticket | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Delete one ticket with existing event, replay; exactly 4/8 rows and declared ticket restored, seven retained tickets untouched |
-| seeds fixed upcoming and past examples across replay dates | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | travelTo baseline: exact two past/two upcoming slug sets using starts_at. At exact event start classify started; at 2028 reference all four past. Replay never moves schedules |
-| rolls back catalogue writes if ticket seeding fails | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Container-bind a test-local TicketTypeSeeder subclass that calls parent::run then throws; run real DatabaseSeeder, catch exception; no new event/ticket persists, preexisting unrelated records unchanged. Remove binding and replay: complete catalogue once. No production injection facility |
-| fails clearly if a ticket seeder's parent is absent | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Call TicketTypeSeeder alone on empty DB; ModelNotFoundException, zero tickets; normal DatabaseSeeder succeeds |
+| Scenario / proposed test name                                  | Exact file                                              | Setup / assertion                                                                                                                                                                                                                                                                               |
+| -------------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| creates the event catalogue on isolated PostgreSQL             | `tests/Feature/EventSchemaTest.php`                     | Guard + DatabaseMigrations; assert live identity/UTC; information_schema verifies listed column types, nullability, defaults and timestamptz precision; pg_catalog verifies named keys/checks/FK/index column order and restrictive actions. Insert valid parent/child and verify persistence   |
+| reverses and reapplies only the event domain migrations        | `tests/Feature/EventSchemaTest.php`                     | Within isolated test harness, require the two migration objects, down ticket then event; assert domain tables absent and existing users/jobs tables retained; up event then ticket, insert valid rows and assert constraints work. No standalone migrate:fresh CLI command                      |
+| rejects missing required catalogue values                      | `tests/Feature/EventSchemaTest.php`                     | Dataset null in each nonnullable non-generated field for both tables; SQLSTATE 23502. Omit fields with defaults in valid test; assert GBP/display_order defaults; nullable description/audit fields accepted                                                                                    |
+| rejects malformed event identities and blank content           | `tests/Feature/EventSchemaTest.php`                     | Empty/uppercase/space-bearing slug; whitespace-only required text fields including timezone/cover; SQLSTATE 23514 and respective constraint                                                                                                                                                     |
+| keeps event slugs unique                                       | `tests/Feature/EventSchemaTest.php`                     | Two rows same slug rejected, 23505; different slug accepted                                                                                                                                                                                                                                     |
+| requires finite events ending after their start                | `tests/Feature/EventSchemaTest.php`                     | Equal/reversed start/end; +/-infinity bounds via direct SQL rejected, 23514. Positive one-second duration and overnight interval accepted; no future-only constraint                                                                                                                            |
+| requires ticket ownership and preserves populated events       | `tests/Feature/EventSchemaTest.php`                     | Orphan event_id insert rejected, 23503; parent delete and referenced PK update rejected, 23503; parent and ticket remain intact                                                                                                                                                                 |
+| keeps ticket codes unique within their event                   | `tests/Feature/EventSchemaTest.php`                     | Duplicate event_id/code rejected 23505; same code under second event allowed; same name allowed; malformed code and blank name rejected 23514                                                                                                                                                   |
+| requires positive total ticket capacity                        | `tests/Feature/EventSchemaTest.php`                     | Raw insert/update dataset 0/-1 rejected 23514, null 23502; 1 and 2,147,483,647 accepted; 2,147,483,648 rejected 22003. Failed update preserves old capacity. No counter created/tested                                                                                                          |
+| stores only paid GBP minor-unit prices                         | `tests/Feature/EventSchemaTest.php`                     | 1/1250/max integer accepted; 0/-1 rejected 23514, null 23502, overflow 22003; EUR/USD/gbp rejected 23514. No float arithmetic or currency conversion                                                                                                                                            |
+| permits display ties but rejects negative ordering             | `tests/Feature/EventSchemaTest.php`                     | Same event/order accepted; 0 accepted, -1 rejected 23514; optional ticket description null accepted                                                                                                                                                                                             |
+| returns only an event's tickets in stable display order        | `tests/Feature/Models/EventTest.php`                    | Two events with tickets, ties/inverse insertion order; relation yields exactly matching IDs ordered display_order/id, never the second event's tickets                                                                                                                                          |
+| accepts IANA identifiers and rejects abbreviations and offsets | `tests/Feature/Models/EventTest.php`                    | Event create/update through assignment: Europe/London, Europe/Helsinki, America/New_York, UTC accepted; BST, +01:00, Mars/Olympus, whitespace rejected with InvalidArgumentException before DB write. Repeat through DatabaseSeeder with WithoutModelEvents to prove supported write path       |
+| preserves UTC instants while displaying event-local time       | `tests/Feature/Models/EventTest.php`                    | Explicit known UTC winter/summer London dates → known local times/offsets, Helsinki January conversion; immutable casts/UTC ISO serialization and unchanged refreshed stored instants. Direct SQL offset input `2026-07-18 14:00:00+01` reads as `13:00:00+00`                                  |
+| keeps distinct instants across an autumn clock change          | `tests/Feature/Models/EventTest.php`                    | London `2026-10-25T00:30:00Z` → 01:30 +01; `01:30:00Z` → 01:30 +00. Persist a valid interval, verify ordering by instants despite repeated wall time; no ambiguous-local-input parser introduced                                                                                                |
+| belongs to its exact event                                     | `tests/Feature/Models/TicketTypeTest.php`               | Factory::for event, assert parent identity and relationship persistence; no unrelated parent returned                                                                                                                                                                                           |
+| returns integer pence and independent total capacities         | `tests/Feature/Models/TicketTypeTest.php`               | Two types same parent with 1250/2000 pence and capacities 3/7; refresh asserts PHP integers/exact values and GBP; changing one type's capacity does not alter its sibling or create event capacity                                                                                              |
+| seeds the exact original catalogue without accounts or sales   | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Seed empty DB, assert exactly 4 events/8 tickets, all literal identities/fields/prices/caps from section 7, single organizer name, valid original cover data URLs, no external image links; zero users/jobs; no orders/payment/counter schema                                                   |
+| repeats seeds without changing identities or existing values   | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Freeze initial clock, seed; capture all rows including IDs/timestamps; advance time, seed again; exact full-row equality, 4/8 counts                                                                                                                                                            |
+| preserves edits and unrelated records on replay                | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Change seeded title, venue, ticket name, price and positive capacity; add unrelated factory event/ticket; rerun; all edits/IDs/timestamps preserved, no duplicate from ticket name change, unrelated records unchanged                                                                          |
+| restores only a missing seeded ticket                          | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Delete one ticket with existing event, replay; exactly 4/8 rows and declared ticket restored, seven retained tickets untouched                                                                                                                                                                  |
+| seeds fixed upcoming and past examples across replay dates     | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | travelTo baseline: exact two past/two upcoming slug sets using starts_at. At exact event start classify started; at 2028 reference all four past. Replay never moves schedules                                                                                                                  |
+| rolls back catalogue writes if ticket seeding fails            | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Container-bind a test-local TicketTypeSeeder subclass that calls parent::run then throws; run real DatabaseSeeder, catch exception; no new event/ticket persists, preexisting unrelated records unchanged. Remove binding and replay: complete catalogue once. No production injection facility |
+| fails clearly if a ticket seeder's parent is absent            | `tests/Feature/Database/Seeders/DatabaseSeederTest.php` | Call TicketTypeSeeder alone on empty DB; ModelNotFoundException, zero tickets; normal DatabaseSeeder succeeds                                                                                                                                                                                   |
 
 Factory behavior is exercised through these fixtures and relationship tests; no separate test mirrors every factory attribute. Seeding tests assert known literal expected results rather than loading the seeder's private definitions to compute expectations. Database timezone membership is not claimed: raw invalid nonblank names are outside the approved recommendation's DB guarantee. If owner requires DB IANA enforcement, revise schema/tests before coding.
 
@@ -295,7 +295,7 @@ Tests themselves use TestCase's identity guard before migration traits. No manua
 
 **Technical recommendations for approval:** bigint keys, explicit ticket code, positive signed integers/checks, restrictive FK, two schedule/order indexes, immutable schedule casts, insert-only seeds, duplicated organizer display attribution instead of an organizer table. Repeated organizer_name is a small denormalization for four catalogue rows; seed tests require one shared value. It does not provide multi-organizer management. GBP column plus check is more explicit than an implicit currency. Ticket description is nullable; covers/venue/schedules are required. No need for repository/action/DTO/value-object layers for this persistence-only boundary.
 
-**Owner decisions required before coding (explicitly approve recommendations or request revision):**
+**Owner decisions approved explicitly at Gate A on 30 October 2026 (original recommendation text retained below):**
 
 1. **Fixed demo season and content:** approve section 7's original organizer/events, illustrative public venues, absolute dates, two GA price tiers and SVG data-URL covers. Fixed dates guarantee replay stability but eventually become entirely past. Alternative: rolling dates only when first creating records, which weakens cross-install determinism; not recommended. Venue listings are illustrative and do not imply actual bookings.
 2. **IANA validation boundary:** approve model assignment membership validation plus database nonblank check, with raw SQL bypass explicitly accepted for this seeded-only write surface. If database-level membership must be guaranteed, request a revised plan for an additional lookup/function/trigger or constrained zone list; those additions are not silently authorized. No seed-time-only check masquerades as global enforcement.
@@ -310,16 +310,66 @@ Forbidden deviations without revised approval: any schema/constraint or public-c
 
 **Gate A — plan approval**
 
-- Approval status/date: **Pending; awaiting explicit owner approval.**
-- Owner decisions and requested revisions: Capacity approved in current instructions; implementation not approved. Section 10 decisions pending.
-- Final approved plan revision: None. Proposed revision 1 dated 30 October 2026.
+- Approval status/date: **Approved explicitly by owner, 30 October 2026.**
+- Owner decisions and requested revisions: All four section 10 recommendations approved: fixed original catalogue/dates/prices/venues/covers; model-level IANA validation with documented database limitation; sold-out fixture deferral; started/past at starts_at <= now. Slice 1A only.
+- Final approved plan revision: Revision 1 dated 30 October 2026.
 - Planning changes: This file added; PLANS.md receives proposal link/status while preserving the existing roadmap amendment. No application code, tests, migrations, seeds, dependencies or database data changed; read-only diagnostics only.
 
-**Gate B — implementation acceptance**
+**Gate B — plan approval**
 
-- Files actually changed compared with approved manifest: Not applicable; implementation has not started.
-- Test commands and actual results: Not run; matrix/commands above are proposals. Read-only inspection confirmed both PostgreSQL servers' versions and isolated test identity/UTC.
+- Approval status/date: **Approved explicitly by owner, 30 October 2026.**
+- Files actually changed compared with approved manifest: All 15 listed files, exactly as approved; no removed files or out-of-manifest source changes. Full implemented-file inventory follows below.
+- Test commands and actual results: See actual execution record below; 84 focused tests and 128 full-regression tests passed on guarded real PostgreSQL.
 - Approved deviations, if any: None.
-- Owner acceptance/date: Pending implementation and review.
 
-Stop here. Approval of this document must be explicit; no Slice 1A implementation or Slice 1B planning/implementation is authorized by its creation.
+### Implementation review record — 30 October 2026
+
+Implemented the approved schema, two lean models, factories, fixed original event/ticket catalogue and atomic insert-only seed entry point. Named database constraints enforce the approved keys, schedule, GBP, positive price and positive capacity rules. Timezone validation runs on assignment even when seeding suppresses model events. No counters, orders, availability claims, HTTP or frontend features were added.
+
+**Every implemented file:**
+
+| Path                                                                  | Result                                                                      |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `app/Models/Event.php`                                                | Added                                                                       |
+| `app/Models/TicketType.php`                                           | Added                                                                       |
+| `database/migrations/2026_10_30_000100_create_events_table.php`       | Added                                                                       |
+| `database/migrations/2026_10_30_000200_create_ticket_types_table.php` | Added                                                                       |
+| `database/factories/EventFactory.php`                                 | Added                                                                       |
+| `database/factories/TicketTypeFactory.php`                            | Added                                                                       |
+| `database/seeders/EventSeeder.php`                                    | Added                                                                       |
+| `database/seeders/TicketTypeSeeder.php`                               | Added                                                                       |
+| `database/seeders/DatabaseSeeder.php`                                 | Modified                                                                    |
+| `tests/Feature/EventSchemaTest.php`                                   | Added                                                                       |
+| `tests/Feature/Models/EventTest.php`                                  | Added                                                                       |
+| `tests/Feature/Models/TicketTypeTest.php`                             | Added                                                                       |
+| `tests/Feature/Database/Seeders/DatabaseSeederTest.php`               | Added                                                                       |
+| `PLANS.md`                                                            | Modified approval/review status                                             |
+| `docs/slice-plans/01a-event-domain.md`                                | Modified approval/review record and repository-required Markdown formatting |
+
+**Actual final verification:** all PHP test commands below ran sequentially on the host/devcontainer path with the unchanged TestCase guard verifying `laravel_test` database/role at the approved isolated endpoint before migration traits. Sandbox network/socket restrictions required authorized execution outside that sandbox; no isolation safeguard was bypassed. No SQLite or test dependency was introduced. Every row below passed with exit 0.
+
+| Command                                                                                                 | Observed result                                                                        |
+| ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `php artisan test --compact tests/Feature/EventSchemaTest.php`                                          | 57 passed, 255 assertions; 6.1 s                                                       |
+| `php artisan test --compact tests/Feature/Models/EventTest.php tests/Feature/Models/TicketTypeTest.php` | 20 passed, 68 assertions; 2.3 s                                                        |
+| `php artisan test --compact tests/Feature/Database/Seeders/DatabaseSeederTest.php`                      | 7 passed, 82 assertions; 1.1 s                                                         |
+| `vendor/bin/pint --dirty --format agent`                                                                | Passed                                                                                 |
+| Explicit 13-PHP-file Pint command from section 8                                                        | Passed; includes all newly generated files                                             |
+| `composer types:check`                                                                                  | PHPStan passed, zero errors                                                            |
+| `php artisan test --compact`                                                                            | 128 passed, 575 assertions; 12.4 s; no skips reported                                  |
+| `npm run check`                                                                                         | All 34 files formatted; lint passed for 23 files with no warnings/errors               |
+| `npm run types:check`                                                                                   | `tsc --noEmit` passed                                                                  |
+| `npm run build`                                                                                         | Passed, 623 modules; existing optional Fontaine optimized-font-fallback notice remains |
+| `git diff --check`                                                                                      | Passed                                                                                 |
+
+**Observed CLI/database demo:** schema tests reversed and recreated only the two domain tables on isolated PostgreSQL, retained infrastructure tables, and exercised real PostgreSQL rejection codes/constraints. Seeder tests produced 4 events and 8 ticket types; replay after moving the clock preserved every row including identity/audit fields. Editing title/venue/ticket name/price/capacity plus adding unrelated records left all values unchanged after replay (5 events/9 types). Deleting one seeded ticket restored only that definition. Injecting failure after ticket insertion rolled back all newly inserted events/types while preserving existing unrelated rows; successful retry then produced the full catalogue exactly once. Frozen 30 October data contained the two specified past and two upcoming events; exact-start classification was started/past, and a 2028 replay left all dates unchanged. All seeded zones were verified against PHP and PostgreSQL identifiers; known local times and DST repeated-hour offsets matched the plan.
+
+**Intermediate failures and resolutions:** initial schema execution was prevented by sandbox sockets before the guard could connect; authorized retry reached real PostgreSQL and showed the intended red missing-table failure. Test-first model execution showed missing model classes and the empty seed entry point. After models/factories, 19/20 model tests passed and the muted-events seed-path test remained red until DatabaseSeeder was wired. Final focused runs after implementation/formatting all passed. Initial PHPStan could not open its local process socket; authorized retry passed without source/config changes. Initial `npm run check` found only Slice 1A plan Markdown formatting; `node_modules/.bin/vp fmt docs/slice-plans/01a-event-domain.md --write` fixed that permitted file, and the rerun passed. No unresolved failures or suppressed checks.
+
+**Database safety and demo limits:** no manual migration or seeding ran against persistent development. A final read-only Boost query confirmed development still has three migration records and neither events nor ticket_types. Tests migrate/seed only the disposable database and clean up through DatabaseMigrations; this handoff does not leave development populated or pretend test fixtures persist after teardown. No deployment, live payment or customer message occurred.
+
+**Deviations:** none. Artisan migration timestamps were normalized to the exact approved filenames, as planned. All production classes, schema, data, seed update/transaction semantics and test isolation stayed within revision 1. No dependency/runtime/test-guard changes.
+
+**Remaining accepted limitations:** raw SQL can bypass model IANA membership checks and timestamp normalization; fixed demo dates eventually all become past; replay preserves existing content rather than repairing edits and can recreate intentionally changed natural identities; rollback drops catalogue data; illustrative venues are not real bookings. Genuine sold-out/remaining-capacity accounting remains deferred. Existing optional Fontaine build notice is non-blocking; no dependency added. No later-slice capacity/payment correctness is claimed by these tests.
+
+Stop at Gate B for explicit owner acceptance. Slice 1B and all later slices remain unstarted.

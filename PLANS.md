@@ -102,10 +102,17 @@ PostgreSQL connection, type check, asset build, and first test successfully.
 ## Slice 1A — Event domain and database
 
 **Detailed plan:** `docs/slice-plans/01a-event-domain.md` (revision 1,
-30 October 2026). **Status: Plan awaiting Gate A approval.** No Slice 1A
-implementation is authorized or started. Content/date policy, timezone
-validation boundary, sold-out fixture deferral and started/past classification
-are explicit approval items in that plan. Slice 1B remains unstarted.
+30 October 2026). **Status: Implementation awaiting Gate B acceptance;
+Gate A approved explicitly on 30 October 2026.** Owner approved content/date policy, timezone validation
+boundary, sold-out fixture deferral and started/past classification.
+Slice 1B remains unstarted.
+
+**Implementation evidence (30 October 2026):** all 15 approved manifest files
+delivered; 84 focused PostgreSQL tests passed; full regression 128 tests /
+575 assertions passed. PHP formatting, PHPStan, JS formatting/lint, TypeScript,
+asset build and diff checks passed. Exact commands, resolved intermediate
+failures, demo and remaining limitations are recorded in the slice plan.
+No persistent development database migration or seeding was performed.
 
 **Engineering result:** PostgreSQL contains a well-constrained, tested and
 repeatably seeded catalogue of events and ticket types. This foundation slice
