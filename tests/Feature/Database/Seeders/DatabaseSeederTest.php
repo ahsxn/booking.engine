@@ -46,6 +46,7 @@ test('seeds the exact original catalogue without accounts or sales', function ()
         'lantern-pages' => ['Lantern Pages: Stories After Dusk', 'Share an evening of short fiction and discuss how writers build atmosphere with light, silence and surprise.', 'The British Library', '96 Euston Road, London NW1 2DB, United Kingdom', 'Europe/London', '2026-11-14T18:00:00.000000Z', '2026-11-14T20:00:00.000000Z', '18:00', 1500, 40, 2200, 12, 'Admission to the story evening.'],
         'new-year-new-chapter' => ['A New Year, A New Chapter', 'Gather for a fresh reading season, compare discoveries and choose a personal reading challenge for the months ahead.', 'Central Library Oodi', 'Töölönlahdenkatu 4, 00100 Helsinki, Finland', 'Europe/Helsinki', '2027-01-16T12:00:00.000000Z', '2027-01-16T14:00:00.000000Z', '14:00', 1400, 28, 2000, 8, 'Admission to the reading gathering.'],
     ];
+    $coverHashes = [];
     foreach ($expected as $slug => [$title, $description, $venue, $address, $zone, $start, $end, $local, $standardPrice, $standardCapacity, $supporterPrice, $supporterCapacity, $ticketDescription]) {
         $event = Event::query()->where('slug', $slug)->firstOrFail();
         expect([$event->title, $event->description, $event->venue_name, $event->venue_address, $event->timezone])->toBe([$title, $description, $venue, $address, $zone]);
@@ -57,11 +58,21 @@ test('seeds the exact original catalogue without accounts or sales', function ()
             ['standard-ga', 'General admission', $ticketDescription, 0, $standardPrice, $standardCapacity, 'GBP'],
             ['supporter-ga', 'Supporter admission', 'The same admission at a voluntary supporter price.', 1, $supporterPrice, $supporterCapacity, 'GBP'],
         ]);
-        expect($event->cover_image_url)->toStartWith('data:image/svg+xml;base64,');
-        $svg = base64_decode(substr($event->cover_image_url, strlen('data:image/svg+xml;base64,')), true);
-        expect($svg)->toContain('<svg', '<path', '<rect')->not->toContain('<script', 'href=', '<image', 'luma');
+        $cover = [
+            'paper-trails' => '/images/events/paper-trails-photo-v1.png',
+            'city-in-the-margins' => '/images/events/city-in-the-margins-photo-v1.png',
+            'lantern-pages' => '/images/events/lantern-pages-photo-v1.png',
+            'new-year-new-chapter' => '/images/events/new-year-new-chapter-photo-v1.png',
+        ][$slug];
+        expect($event->cover_image_url)->toBe($cover);
+        $path = public_path(ltrim($cover, '/'));
+        $this->assertFileExists($path);
+        expect(getimagesize($path))->toMatchArray([0 => 1024, 1 => 1024, 'mime' => 'image/png']);
+        expect(filesize($path))->toBeLessThanOrEqual(2097152);
+        $coverHashes[] = hash_file('sha256', $path);
     }
     expect(Event::query()->distinct()->pluck('cover_image_url'))->toHaveCount(4);
+    expect(array_unique($coverHashes))->toHaveCount(4);
 });
 
 test('repeats seeds without changing identities values or audit timestamps', function () {
@@ -79,7 +90,7 @@ test('repeats seeds without changing identities values or audit timestamps', fun
 
 test('preserves edits and unrelated records on replay', function () {
     $this->seed();
-    Event::query()->where('slug', 'paper-trails')->firstOrFail()->update(['title' => 'Edited title', 'venue_name' => 'Edited venue']);
+    Event::query()->where('slug', 'paper-trails')->firstOrFail()->update(['title' => 'Edited title', 'venue_name' => 'Edited venue', 'cover_image_url' => '/images/owner-edited-cover.png']);
     $event = Event::query()->where('slug', 'paper-trails')->firstOrFail();
     $event->ticketTypes()->where('code', 'standard-ga')->firstOrFail()->update(['name' => 'Edited admission', 'price_minor' => 1750, 'capacity' => 99]);
     TicketType::factory()->create();

@@ -1,9 +1,40 @@
 import { InfiniteScroll, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import EventCard from '@/components/events/event-card';
+import EventCardSkeleton from '@/components/events/event-card-skeleton';
+import AlertError from '@/components/alert-error';
+import { Button } from '@/components/ui/button';
 import { home } from '@/routes';
 import type { EventListingPageProps } from '@/types/events';
 
 type Props = EventListingPageProps & { navigating: boolean };
+
+function AppendLoadingIndicator({ loading }: { loading: boolean }) {
+    const [visible, setVisible] = useState(false);
+
+    useEffect(() => {
+        if (!loading) {
+            setVisible(false);
+            return;
+        }
+
+        const timer = setTimeout(() => setVisible(true), 200);
+        return () => clearTimeout(timer);
+    }, [loading]);
+
+    if (!loading) {
+        return null;
+    }
+
+    return (
+        <>
+            <p role="status" className="sr-only">
+                Loading more events.
+            </p>
+            {visible && <EventCardSkeleton />}
+        </>
+    );
+}
 
 export default function EventFeed({ view, events, navigating }: Props) {
     const [error, setError] = useState<string | null>(null);
@@ -29,7 +60,7 @@ export default function EventFeed({ view, events, navigating }: Props) {
                     reset: ['events'],
                     only: ['view', 'events'],
                     preserveState: false,
-                    preserveScroll: false,
+                    preserveScroll: true,
                     onNetworkError: () => {
                         setError(
                             'Unable to load events. Please try the start link again.',
@@ -46,17 +77,22 @@ export default function EventFeed({ view, events, navigating }: Props) {
                     },
                 });
             }}
-            className="underline focus-visible:outline-2"
+            className="mb-4 inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
         >
             Start of this view
         </a>
     );
     if (events.data.length === 0) {
         return (
-            <div>
-                <p>No {label} events.</p>
+            <div className="grid gap-3 rounded-xl border border-dashed p-6 text-sm sm:p-8">
+                <p className="font-medium">No {label} events.</p>
                 {startLink}
-                {error && <p role="alert">{error}</p>}
+                {error && (
+                    <AlertError
+                        errors={[error]}
+                        title="Unable to load events"
+                    />
+                )}
             </div>
         );
     }
@@ -90,63 +126,37 @@ export default function EventFeed({ view, events, navigating }: Props) {
                 manual={error !== null || navigating}
                 className="space-y-8"
                 next={({ loading, fetch, hasMore }) => (
-                    <div className="py-4" aria-live="polite">
-                        {loading && <p role="status">Loading more events…</p>}
-                        {error && <p role="alert">{error}</p>}
+                    <div className="grid justify-items-start gap-4 py-6">
+                        <AppendLoadingIndicator loading={loading} />
+                        {error && (
+                            <AlertError
+                                errors={[error]}
+                                title="Unable to load events"
+                            />
+                        )}
                         {hasMore ? (
-                            <button
+                            <Button
                                 type="button"
                                 onClick={fetch}
                                 disabled={loading || navigating}
-                                className="underline focus-visible:outline-2"
+                                className="h-auto min-h-11 px-5 whitespace-normal focus-visible:ring-ring motion-reduce:transition-none"
                             >
                                 {error ? 'Retry' : 'Load more'}
-                            </button>
+                            </Button>
                         ) : (
-                            <p>All {label} events loaded.</p>
+                            <p
+                                role="status"
+                                className="text-sm text-muted-foreground"
+                            >
+                                All {label} events loaded.
+                            </p>
                         )}
                     </div>
                 )}
             >
                 {events.data.map((event) => (
-                    <li key={event.id} className="space-y-2">
-                        <h3 className="text-xl font-semibold">{event.title}</h3>
-                        <p>{event.organizerName}</p>
-                        <p>
-                            {event.venueName} — {event.venueAddress}
-                        </p>
-                        <p>
-                            Starts:{' '}
-                            <time dateTime={event.startsAt}>
-                                {event.startsAtLabel}
-                            </time>
-                            <br />
-                            Ends:{' '}
-                            <time dateTime={event.endsAt}>
-                                {event.endsAtLabel}
-                            </time>
-                            <br />
-                            Time zone: {event.timezone}
-                        </p>
-                        {event.ticketTypes.length === 0 ? (
-                            <p>
-                                No ticket information is listed for this event.
-                            </p>
-                        ) : (
-                            <ul className="space-y-2">
-                                {event.ticketTypes.map((ticket) => (
-                                    <li key={ticket.id}>
-                                        <p>
-                                            {ticket.name}: {ticket.priceLabel}{' '}
-                                            {ticket.currency}
-                                        </p>
-                                        {ticket.description && (
-                                            <p>{ticket.description}</p>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
+                    <li key={event.id} className="event-feed-item">
+                        <EventCard event={event} />
                     </li>
                 ))}
             </InfiniteScroll>

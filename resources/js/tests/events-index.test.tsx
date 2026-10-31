@@ -4,8 +4,58 @@ vi.mock(
     '@/components/events/event-feed',
     () => import('../components/events/event-feed'),
 );
+vi.mock(
+    '@/components/events/event-card',
+    () => import('../components/events/event-card'),
+);
+vi.mock(
+    '@/components/events/event-cover',
+    () => import('../components/events/event-cover'),
+);
+vi.mock(
+    '@/components/events/ticket-type-list',
+    () => import('../components/events/ticket-type-list'),
+);
+vi.mock('@/components/ui/card', () => import('../components/ui/card'));
+vi.mock('@/components/ui/button', () => import('../components/ui/button'));
+vi.mock('@/components/ui/skeleton', () => import('../components/ui/skeleton'));
+vi.mock('@/components/alert-error', () => import('../components/alert-error'));
+vi.mock('@/components/ui/alert', () => import('../components/ui/alert'));
+vi.mock('@/lib/utils', () => import('../lib/utils'));
+vi.mock(
+    '@/components/events/organizer-hero',
+    () => import('../components/events/organizer-hero'),
+);
+vi.mock(
+    '@/components/events/visual-calendar',
+    () => import('../components/events/visual-calendar'),
+);
+vi.mock(
+    '@/components/events/event-category-badge',
+    () => import('../components/events/event-category-badge'),
+);
+vi.mock(
+    '@/components/events/event-attendee-stack',
+    () => import('../components/events/event-attendee-stack'),
+);
+vi.mock('@/components/ui/badge', () => import('../components/ui/badge'));
+vi.mock('@/components/ui/avatar', () => import('../components/ui/avatar'));
+vi.mock('@/lib/event-presentation', () => import('../lib/event-presentation'));
+vi.mock(
+    '@/components/events/event-card-skeleton',
+    () => import('../components/events/event-card-skeleton'),
+);
+import EventCardSkeleton from '../components/events/event-card-skeleton';
+import EventCard from '../components/events/event-card';
+import EventCover from '../components/events/event-cover';
+import VisualCalendar from '../components/events/visual-calendar';
 import { isValidElement } from 'react';
-import type { ComponentProps, MouseEvent, ReactNode } from 'react';
+import type {
+    ComponentProps,
+    MouseEvent,
+    ReactElement,
+    ReactNode,
+} from 'react';
 import { router } from '@inertiajs/react';
 import type { InfiniteScroll } from '@inertiajs/react';
 import { http, HttpNetworkError, HttpResponseError } from '@inertiajs/core';
@@ -23,25 +73,112 @@ import {
 import EventsIndex from '../pages/events';
 import type { EventListing, EventListingPageProps } from '../types/events';
 
-const { scrollState, scrollOptions, setError, localState } = vi.hoisted(() => ({
-    scrollState: { loading: false, hasMore: false },
-    scrollOptions: vi.fn(),
-    setError: vi.fn(),
-    localState: { error: null as string | null },
+const { scrollState, scrollOptions, setError, localState, clockSubscription } =
+    vi.hoisted(() => ({
+        scrollState: { loading: false, hasMore: false },
+        scrollOptions: vi.fn(),
+        setError: vi.fn(),
+        localState: {
+            error: null as string | null,
+            failedSource: '',
+            serverClock: false,
+        },
+        clockSubscription: vi.fn(),
+    }));
+const componentHooks = vi.hoisted(() => ({
+    active: false,
+    cursor: 0,
+    cells: [] as Array<{
+        value: unknown;
+        dependencies?: readonly unknown[];
+        cleanup?: () => void;
+    }>,
+    pending: [] as Array<() => void>,
 }));
+
 afterEach(() => {
+    for (const cell of componentHooks.cells) cell.cleanup?.();
+    componentHooks.active = false;
+    componentHooks.cursor = 0;
+    componentHooks.cells = [];
+    componentHooks.pending = [];
+    vi.restoreAllMocks();
     scrollState.loading = false;
     scrollState.hasMore = false;
     localState.error = null;
+    localState.failedSource = '';
+    localState.serverClock = false;
+    vi.useRealTimers();
     vi.clearAllMocks();
 });
 
 vi.mock('react', async (importOriginal) => ({
     ...(await importOriginal<typeof import('react')>()),
-    useState: (initial: unknown) => [
-        initial === null ? localState.error : initial,
-        setError,
-    ],
+    useSyncExternalStore: (
+        subscribe: (listener: () => void) => () => void,
+        getSnapshot: () => unknown,
+        getServerSnapshot: () => unknown,
+    ) => {
+        clockSubscription(subscribe);
+        return localState.serverClock ? getServerSnapshot() : getSnapshot();
+    },
+    useState: (initial: unknown) => {
+        if (componentHooks.active) {
+            const index = componentHooks.cursor++;
+            const cell = (componentHooks.cells[index] ??= {
+                value: typeof initial === 'function' ? initial() : initial,
+            });
+            return [
+                cell.value,
+                (value: unknown) => {
+                    cell.value =
+                        typeof value === 'function' ? value(cell.value) : value;
+                },
+            ];
+        }
+        return [
+            initial === null
+                ? localState.error
+                : initial === ''
+                  ? localState.failedSource
+                  : initial,
+            setError,
+        ];
+    },
+    useRef: (initial: unknown) => {
+        if (!componentHooks.active) return { current: initial };
+        const index = componentHooks.cursor++;
+        const cell = (componentHooks.cells[index] ??= {
+            value: { current: initial },
+        });
+        return cell.value;
+    },
+    useEffect: (
+        effect: () => void | (() => void),
+        dependencies?: readonly unknown[],
+    ) => {
+        if (!componentHooks.active) return;
+        const index = componentHooks.cursor++;
+        const cell = (componentHooks.cells[index] ??= { value: undefined });
+        if (
+            !dependencies ||
+            !cell.dependencies ||
+            dependencies.length !== cell.dependencies.length ||
+            dependencies.some(
+                (value, i) => !Object.is(value, cell.dependencies![i]),
+            )
+        ) {
+            componentHooks.pending.push(() => {
+                cell.cleanup?.();
+                const cleanup = effect();
+                cell.cleanup =
+                    typeof cleanup === 'function' ? cleanup : undefined;
+                cell.dependencies = dependencies
+                    ? [...dependencies]
+                    : undefined;
+            });
+        }
+    },
 }));
 
 vi.mock('@inertiajs/react', async (importOriginal) => ({
@@ -140,7 +277,7 @@ function render(
 }
 
 describe('event listing', () => {
-    it('renders actual event and ticket fields in the supplied group order', () => {
+    it('renders compact event summaries in the supplied group order', () => {
         const html = render({
             upcoming: [event, { ...event, id: 2, title: 'Second event' }],
             past: [{ ...event, id: 3, title: 'Past event' }],
@@ -152,13 +289,8 @@ describe('event listing', () => {
             'A New Chapter',
             'Margin &amp; Lantern',
             'Reading Room',
-            '1 Library Street',
-            'General admission',
-            'Supporter admission',
-            '£12.50',
-            '£20.00',
-            'GBP',
-            'The same admission at a supporter price.',
+            '01:30',
+            'From £12.50',
         ]) {
             expect(html).toContain(text);
         }
@@ -169,33 +301,69 @@ describe('event listing', () => {
         expect(html).toContain('href="/?view=past"');
         expect(html).toContain('aria-current="page"');
         expect(html).toContain('All upcoming events loaded.');
-        expect(html.indexOf('General admission')).toBeLessThan(
-            html.indexOf('Supporter admission'),
-        );
+        for (const hidden of [
+            '1 Library Street',
+            'General admission',
+            'Supporter admission',
+            'The same admission at a supporter price.',
+            '£20.00',
+            'GBP',
+            event.startsAtLabel,
+            event.endsAtLabel,
+            event.timezone,
+        ]) {
+            expect(html).not.toContain(hidden);
+        }
         expect(html).not.toContain('null');
     });
 
-    it('renders server labels and UTC time attributes without browser date conversion', () => {
-        const html = render({ upcoming: [event], past: [] });
-        expect(html).toContain('1 January 2027, 01:30 (+02:00)');
-        expect(html).toContain('1 January 2027, 03:30 (+02:00)');
-        expect(html).toContain('Europe/Helsinki');
-        expect(html).toContain('dateTime="2026-12-31T23:30:00.000000Z"');
-        expect(html).toContain('dateTime="2027-01-01T01:30:00.000000Z"');
-        const dst = render({
-            upcoming: [
-                {
-                    ...event,
-                    timezone: 'Europe/London',
-                    startsAtLabel: '25 October 2026, 01:30 (+01:00)',
-                    endsAtLabel: '25 October 2026, 01:30 (+00:00)',
-                },
-            ],
-            past: [],
-        });
-        expect(dst).toContain('25 October 2026, 01:30 (+01:00)');
-        expect(dst).toContain('25 October 2026, 01:30 (+00:00)');
-    });
+    it.each([
+        {
+            timezone: 'Europe/Helsinki',
+            instant: '2026-12-31T23:30:00.000000Z',
+            localDate: '2027-01-01',
+            time: '01:30',
+        },
+        {
+            timezone: 'America/New_York',
+            instant: '2026-12-31T23:30:00.000000Z',
+            localDate: '2026-12-31',
+            time: '18:30',
+        },
+        {
+            timezone: 'Europe/London',
+            instant: '2026-10-25T00:30:00.000000Z',
+            localDate: '2026-10-25',
+            time: '01:30',
+        },
+        {
+            timezone: 'Europe/London',
+            instant: '2026-10-25T01:30:00.000000Z',
+            localDate: '2026-10-25',
+            time: '01:30',
+        },
+    ])(
+        'shows event-local time for $timezone at $instant',
+        ({ timezone, instant, localDate, time }) => {
+            const html = render({
+                upcoming: [
+                    {
+                        ...event,
+                        timezone,
+                        startsAt: instant,
+                        localStartDate: localDate,
+                    },
+                ],
+                past: [],
+            });
+            expect(html).toContain('>' + time + '</time>');
+            expect(html).toContain('dateTime="' + instant + '"');
+            expect(html).toContain('dateTime="' + localDate + '"');
+            expect(html).not.toContain(timezone);
+            expect(html).not.toContain('Starts:');
+            expect(html).not.toContain('Ends:');
+        },
+    );
 
     it.each([
         { upcoming: [], past: [], upcomingEmpty: true, pastEmpty: true },
@@ -216,13 +384,95 @@ describe('event listing', () => {
         },
     );
 
-    it('shows an honest ticketless state without a sales claim', () => {
-        expect(
-            render({ upcoming: [{ ...event, ticketTypes: [] }], past: [] }),
-        ).toContain('No ticket information is listed for this event.');
+    it('omits price for a ticketless event without a sales claim', () => {
+        const html = render({
+            upcoming: [{ ...event, ticketTypes: [] }],
+            past: [],
+        });
+        expect(html).not.toContain('event-price-badge');
+        expect(html).not.toMatch(/free|sold out|available tickets/i);
     });
 
-    it('escapes catalogue content and does not render future-slice controls or covers', () => {
+    it.each([
+        {
+            tickets: [event.ticketTypes[1], event.ticketTypes[0]],
+            price: '£12.50',
+        },
+        { tickets: [event.ticketTypes[1]], price: '£20.00' },
+        {
+            tickets: [
+                event.ticketTypes[0],
+                {
+                    ...event.ticketTypes[1],
+                    priceMinor: 1250,
+                    priceLabel: '£12.50',
+                },
+            ],
+            price: '£12.50',
+        },
+    ])(
+        'shows the truthful starting price $price without mutating tickets',
+        ({ tickets, price }) => {
+            const before = tickets.map((ticket) => ({ ...ticket }));
+            const html = render({
+                upcoming: [{ ...event, ticketTypes: tickets }],
+                past: [],
+            });
+            expect(html).toContain('From ' + price);
+            expect(tickets).toEqual(before);
+        },
+    );
+
+    it.each([
+        { slug: 'paper-trails', label: 'Reading circle', tone: 'violet' },
+        {
+            slug: 'city-in-the-margins',
+            label: 'Book discussion',
+            tone: 'violet',
+        },
+        { slug: 'lantern-pages', label: 'Short fiction', tone: 'orange' },
+        {
+            slug: 'new-year-new-chapter',
+            label: 'Reading circle',
+            tone: 'violet',
+        },
+    ])('uses the approved category for $slug', ({ slug, label, tone }) => {
+        const html = render({ upcoming: [{ ...event, slug }], past: [] });
+        expect(html).toContain(label);
+        expect(html).toContain('data-tone="' + tone + '"');
+    });
+
+    it.each(['year-boundary', 'constructor', 'toString'])(
+        'does not invent a category for %s',
+        (slug) => {
+            expect(
+                render({ upcoming: [{ ...event, slug }], past: [] }),
+            ).not.toContain('event-category-badge');
+        },
+    );
+
+    it('renders attendee visuals only from explicitly supplied presentation data', () => {
+        const live = render({ upcoming: [event], past: [] });
+        expect(live).not.toContain('aria-label="Attendees"');
+        const illustrative = renderToStaticMarkup(
+            <EventCard
+                event={event}
+                attendees={[
+                    { name: 'Alex Lane', initials: 'AL' },
+                    { name: '<Jamie Shaw>', initials: 'JS' },
+                ]}
+            />,
+        );
+        expect(illustrative).toContain('aria-label="Attendees"');
+        expect(illustrative).toContain('Alex Lane');
+        expect(illustrative).toContain('&lt;Jamie Shaw&gt;');
+        expect(illustrative).toContain('AL');
+        expect(illustrative).not.toMatch(
+            /registered|sold out|available tickets|\+\d/i,
+        );
+    });
+
+    it('escapes catalogue content while showing covers without future-slice controls', () => {
         const html = render({
             upcoming: [
                 {
@@ -230,7 +480,11 @@ describe('event listing', () => {
                     title: '<script>alert(1)</script>',
                     venueName: '<b>Venue</b>',
                     ticketTypes: [
-                        { ...event.ticketTypes[0], name: '<em>Ticket</em>' },
+                        {
+                            ...event.ticketTypes[0],
+                            name: '<em>Ticket</em>',
+                            priceLabel: '<em>£12.50</em>',
+                        },
                     ],
                 },
             ],
@@ -238,11 +492,13 @@ describe('event listing', () => {
         });
         expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
         expect(html).toContain('&lt;b&gt;Venue&lt;/b&gt;');
-        expect(html).toContain('&lt;em&gt;Ticket&lt;/em&gt;');
+        expect(html).toContain('From &lt;em&gt;£12.50&lt;/em&gt;');
+        expect(html).not.toContain('&lt;em&gt;Ticket&lt;/em&gt;');
         expect(html).not.toMatch(
-            /<script|<img|<input|<select|background-image|sold out|remaining tickets/i,
+            /<script|<input|<select|sold out|remaining tickets/i,
         );
-        expect(html).not.toContain('/unused-cover.svg');
+        expect(html).toContain('src="/unused-cover.svg"');
+        expect(html).toContain('alt=""');
     });
 });
 
@@ -312,6 +568,7 @@ afterAll(() => vi.unstubAllGlobals());
 it.each(['upcoming', 'past'] as const)(
     'sends a native reset request through the real router when navigating to %s',
     async (target) => {
+        const visit = vi.spyOn(router, 'visit');
         const transport = vi
             .spyOn(http.getClient(), 'request')
             .mockRejectedValue(new HttpNetworkError('offline'));
@@ -322,6 +579,15 @@ it.each(['upcoming', 'past'] as const)(
             const activation = click();
             link.onClick!(activation);
             expect(activation.preventDefault).toHaveBeenCalledOnce();
+            expect(visit).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({
+                    preserveScroll: true,
+                    preserveState: false,
+                    reset: ['events'],
+                    only: ['view', 'events'],
+                }),
+            );
             await vi.waitFor(() => expect(transport).toHaveBeenCalledOnce());
             expect(transport.mock.calls[0][0]).toMatchObject({
                 method: 'get',
@@ -384,6 +650,7 @@ it.each([
 );
 
 it('sends native reset through the real router for a deep-page start link', async () => {
+    const visit = vi.spyOn(router, 'visit');
     const transport = vi
         .spyOn(http.getClient(), 'request')
         .mockRejectedValue(new HttpNetworkError('offline'));
@@ -397,6 +664,15 @@ it('sends native reset through the real router for a deep-page start link', asyn
             }),
         )[0];
         link.onClick!(click());
+        expect(visit).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                preserveScroll: true,
+                preserveState: false,
+                reset: ['events'],
+                only: ['view', 'events'],
+            }),
+        );
         await vi.waitFor(() => expect(transport).toHaveBeenCalledOnce());
         expect(transport.mock.calls[0][0]).toMatchObject({
             url: 'http://localhost/?view=upcoming',
@@ -436,7 +712,7 @@ it.each([
                         navigating: false,
                     }),
                 ),
-            ];
+            ].filter((anchor) => anchor.href?.startsWith('/?view='));
             for (const link of links) {
                 const activation = click(
                     overrides as Partial<MouseEvent<HTMLAnchorElement>>,
@@ -487,7 +763,10 @@ it('renders loading and manual retry states with existing rows', () => {
     scrollState.hasMore = true;
     scrollState.loading = true;
     let html = render({ upcoming: [event], past: [] });
-    expect(html).toContain('Loading more events');
+    expect(html).toContain(
+        '<p role="status" class="sr-only">Loading more events.</p>',
+    );
+    expect(html).not.toContain('data-slot="event-card-skeleton"');
     expect(html).toContain('disabled');
     scrollState.loading = false;
     localState.error = 'Too many requests; try again shortly';
@@ -524,3 +803,423 @@ it.each([{ rows: [event] }, { rows: [] }])(
         expect(html).toContain('href="/?view=upcoming"');
     },
 );
+
+it('keeps a semantic date rail and compact event articles', () => {
+    const html = render({ upcoming: [event], past: [] });
+    expect(html).toContain('dateTime="2027-01-01"');
+    expect(html).toContain('aria-labelledby="event-1-title"');
+    expect(html).toContain('<h4');
+    expect(html).toContain('id="event-1-title"');
+});
+
+it('shows a stable cover fallback and permits a replacement source', () => {
+    const cover = EventCover({ src: '/broken.svg', title: 'Reading circle' });
+    const image = cover.props.children as ReactElement<ComponentProps<'img'>>;
+    image.props.onError!({} as never);
+    expect(setError).toHaveBeenCalledWith('/broken.svg');
+    localState.failedSource = '/broken.svg';
+    const failed = renderToStaticMarkup(
+        <EventCover src="/broken.svg" title="Reading circle" />,
+    );
+    expect(failed).toContain('Cover unavailable');
+    expect(failed).not.toContain('<img');
+    const replacement = renderToStaticMarkup(
+        <EventCover src="/replacement.svg" title="Reading circle" />,
+    );
+    expect(replacement).toContain('src="/replacement.svg"');
+    expect(
+        renderToStaticMarkup(<EventCover src="" title="Empty" />),
+    ).not.toContain('<img');
+});
+
+describe('visual calendar', () => {
+    it('uses the visitor local month at a UTC year boundary', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2027-01-01T00:30:00Z'));
+        const html = renderToStaticMarkup(<VisualCalendar />);
+        const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const expected =
+            zone === 'Pacific/Honolulu' ? 'December 2026' : 'January 2027';
+        expect(html).toContain(`<caption>${expected}</caption>`);
+    });
+
+    it.each([
+        { year: 2028, month: 1, caption: 'February 2028', day: '2028-02-29' },
+        { year: 2027, month: 1, caption: 'February 2027', day: '2027-02-28' },
+        { year: 2026, month: 3, caption: 'April 2026', day: '2026-04-30' },
+        { year: 2027, month: 0, caption: 'January 2027', day: '2026-12-28' },
+    ])(
+        'renders the correct static month for $caption',
+        ({ year, month, caption, day }) => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date(year, month, 15, 12));
+            const html = renderToStaticMarkup(<VisualCalendar />);
+            expect(html).toContain(`<caption>${caption}</caption>`);
+            expect(html).toContain(`dateTime="${day}"`);
+            expect(html.match(/<td[ >]/g)).toHaveLength(42);
+            expect(html.indexOf('Monday')).toBeLessThan(html.indexOf('Sunday'));
+            if (year === 2027 && month === 1) {
+                expect(html).not.toContain('2027-02-29');
+            }
+        },
+    );
+
+    it('does not depend on events, view or pagination', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2028, 1, 15, 12));
+        const appended = props([
+            event,
+            { ...event, id: 2, localStartDate: '2030-09-10' },
+        ]);
+        for (const page of [
+            props([]),
+            props([event]),
+            props([], [event], 'past'),
+            appended,
+            { ...appended, events: { ...appended.events, current_page: 3 } },
+        ]) {
+            const html = renderToStaticMarkup(<EventsIndex {...page} />);
+            expect(html).toContain('<caption>February 2028</caption>');
+            expect(html).not.toContain('Month not shown');
+        }
+    });
+
+    it('provides a labelled static table without selectable dates or event markers', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 10, 15, 12));
+        const html = renderToStaticMarkup(<VisualCalendar />);
+        expect(html).toContain('Display only');
+        expect(html).toContain('Dates cannot be selected');
+        expect(html).toContain('scope="col"');
+        expect(html).toMatch(/dateTime="2026-10-26"/);
+        expect(html).not.toMatch(
+            /<button|<a |<input|<select|role="grid"|tabindex|tabIndex|aria-selected|aria-current/,
+        );
+    });
+
+    it('reserves the frame until the visitor clock is available during hydration', () => {
+        localState.serverClock = true;
+        const html = renderToStaticMarkup(<VisualCalendar />);
+        expect(html).not.toContain('<table');
+        expect(html).toContain('Calendar');
+        expect(html).not.toContain('Month not shown');
+    });
+
+    it('rechecks at local midnight and cleans up its timer and focus listener', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date(2026, 11, 31, 23, 59, 59));
+        renderToStaticMarkup(<VisualCalendar />);
+        const subscribe = clockSubscription.mock.calls[0][0] as (
+            callback: () => void,
+        ) => () => void;
+        const onChange = vi.fn();
+        const removeListener = vi.fn();
+        Object.assign(window, { removeEventListener: removeListener });
+        const cleanup = subscribe(onChange);
+        vi.advanceTimersByTime(1100);
+        expect(onChange).toHaveBeenCalledOnce();
+        expect(renderToStaticMarkup(<VisualCalendar />)).toContain(
+            '<caption>January 2027</caption>',
+        );
+        cleanup();
+        expect(removeListener).toHaveBeenCalledWith(
+            'focus',
+            expect.any(Function),
+        );
+        expect(vi.getTimerCount()).toBe(0);
+    });
+});
+
+// A component-local hook driver for display timers; it does not simulate a browser or Inertia history.
+function componentHarness(renderComponent: () => ReactNode) {
+    componentHooks.cells = [];
+    componentHooks.pending = [];
+    function commitEffects() {
+        for (const effect of componentHooks.pending.splice(0)) effect();
+    }
+    function render(commit = true) {
+        componentHooks.cursor = 0;
+        componentHooks.active = true;
+        let output: ReactNode;
+        try {
+            output = renderComponent();
+        } finally {
+            componentHooks.active = false;
+        }
+        if (commit) commitEffects();
+        return output;
+    }
+    function unmount() {
+        for (const cell of componentHooks.cells) cell.cleanup?.();
+        componentHooks.cells = [];
+        componentHooks.pending = [];
+    }
+    return {
+        render,
+        html: () => renderToStaticMarkup(render()),
+        commitEffects,
+        unmount,
+    };
+}
+
+function pendingView(view: 'upcoming' | 'past' = 'past') {
+    const visit = vi.spyOn(router, 'visit').mockImplementation(() => {});
+    const ui = componentHarness(() => EventsIndex(props([event])));
+    const link = anchors(ui.render()).find(
+        (anchor) => anchor.href === '/?view=' + view,
+    )!;
+    link.onClick!(click());
+    const options = visit.mock.calls[0][1]!;
+    options.onStart!({} as never);
+    return { ui, options };
+}
+
+function appendIndicator() {
+    const feed = EventFeed({ ...props([event]), navigating: false });
+    const scroll = feed.props.children[1] as ReactElement<
+        ComponentProps<typeof InfiniteScroll>
+    >;
+    const next = scroll.props.next;
+    if (typeof next !== 'function')
+        throw new Error('Expected native next slot.');
+    const slot = next({
+        loading: false,
+        loadingPrevious: false,
+        loadingNext: false,
+        fetch: vi.fn(),
+        hasMore: true,
+        hasNext: true,
+        hasPrevious: false,
+        autoMode: true,
+        manualMode: false,
+    }) as ReactElement<{ children: ReactElement<{ loading: boolean }>[] }>;
+    return slot.props.children[0].type as (props: {
+        loading: boolean;
+    }) => ReactNode;
+}
+
+describe('delayed event loading', () => {
+    it('shows two slow-view skeletons after 200ms without removing or tracking the old rows', () => {
+        vi.useFakeTimers();
+        const { ui, options } = pendingView();
+        expect(ui.html()).toContain(
+            '<p role="status" class="sr-only">Loading past events.</p>',
+        );
+        vi.advanceTimersByTime(199);
+        expect(ui.html()).not.toContain('data-slot="event-card-skeleton"');
+        vi.advanceTimersByTime(1);
+        const pending = ui.html();
+        expect(pending.match(/data-slot="event-card-skeleton"/g)).toHaveLength(
+            2,
+        );
+        expect(pending).toContain('inert=""');
+        expect(pending).toContain('class="invisible"');
+        expect(pending).toContain('A New Chapter');
+        expect(pending.match(/<ul>[\s\S]*?<\/ul>/)?.[0]).not.toContain(
+            'event-card-skeleton',
+        );
+        expect(scrollOptions).toHaveBeenLastCalledWith(
+            expect.objectContaining({ manual: true }),
+        );
+        options.onFinish!({} as never);
+        expect(ui.html()).not.toContain('event-card-skeleton');
+        expect(ui.html()).not.toContain('inert=""');
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it.each([0, 50, 199])(
+        'does not flash skeletons for a view request completing at %dms',
+        (duration) => {
+            vi.useFakeTimers();
+            const { ui, options } = pendingView();
+            vi.advanceTimersByTime(duration);
+            options.onFinish!({} as never);
+            vi.advanceTimersByTime(1000);
+            expect(ui.html()).not.toContain('event-card-skeleton');
+            expect(ui.html()).not.toContain('Loading past events.');
+            expect(vi.getTimerCount()).toBe(0);
+        },
+    );
+
+    it('does not show view skeletons when reloading the selected view', () => {
+        vi.useFakeTimers();
+        const { ui, options } = pendingView('upcoming');
+        vi.advanceTimersByTime(1000);
+        expect(ui.html()).not.toContain('event-card-skeleton');
+        options.onFinish!({} as never);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it.each([100, 250])(
+        'cleans up cancellation at %dms without showing an error',
+        (duration) => {
+            vi.useFakeTimers();
+            const { ui, options } = pendingView();
+            vi.advanceTimersByTime(duration);
+            options.onCancel!();
+            vi.advanceTimersByTime(1000);
+            const html = ui.html();
+            expect(html).not.toContain('event-card-skeleton');
+            expect(html).not.toContain('role="alert"');
+            expect(html).toContain('A New Chapter');
+            expect(vi.getTimerCount()).toBe(0);
+        },
+    );
+
+    it.each([
+        {
+            status: 0,
+            message: 'Unable to switch views. Please try the view link again.',
+        },
+        {
+            status: 500,
+            message: 'Unable to switch views. Please try the view link again.',
+        },
+        { status: 429, message: 'Too many requests; try again shortly' },
+    ])(
+        'restores existing rows and clears slow placeholders on failure $status',
+        ({ status, message }) => {
+            vi.useFakeTimers();
+            const { ui, options } = pendingView();
+            vi.advanceTimersByTime(200);
+            expect(ui.html()).toContain('event-card-skeleton');
+            if (status === 0) {
+                expect(options.onNetworkError!({} as never)).toBe(false);
+            } else {
+                expect(
+                    options.onHttpException!({
+                        status,
+                        data: '<private>',
+                    } as never),
+                ).toBe(false);
+            }
+            options.onFinish!({} as never);
+            const html = ui.html();
+            expect(html).toContain(message);
+            expect(html).toContain('A New Chapter');
+            expect(html).not.toContain('event-card-skeleton');
+            expect(html).not.toContain('inert=""');
+            expect(html).not.toContain('&lt;private&gt;');
+            expect(vi.getTimerCount()).toBe(0);
+        },
+    );
+
+    it('cancels a pending timer on unmount and mounts restored props with no stale loading state', () => {
+        vi.useFakeTimers();
+        const { ui } = pendingView();
+        vi.advanceTimersByTime(100);
+        ui.unmount();
+        vi.advanceTimersByTime(1000);
+        const restored = componentHarness(() =>
+            EventsIndex(props([], [event], 'past')),
+        );
+        const html = restored.html();
+        expect(html).toContain('A New Chapter');
+        expect(html).toContain('All past events loaded.');
+        expect(html).not.toContain('event-card-skeleton');
+        expect(html).not.toContain('inert=""');
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('delays append skeletons and removes them synchronously before effect cleanup', () => {
+        vi.useFakeTimers();
+        const Indicator = appendIndicator();
+        let loading = true;
+        const ui = componentHarness(() => Indicator({ loading }));
+        expect(ui.html()).toContain('Loading more events.');
+        vi.advanceTimersByTime(199);
+        expect(ui.html()).not.toContain('event-card-skeleton');
+        vi.advanceTimersByTime(1);
+        expect(
+            ui.html().match(/data-slot="event-card-skeleton"/g),
+        ).toHaveLength(1);
+        loading = false;
+        expect(renderToStaticMarkup(ui.render(false))).toBe('');
+        ui.commitEffects();
+        loading = true;
+        expect(ui.html()).not.toContain('event-card-skeleton');
+        vi.advanceTimersByTime(200);
+        expect(ui.html()).toContain('event-card-skeleton');
+        ui.unmount();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it.each([0, 199])(
+        'does not flash a fast append finishing at %dms',
+        (duration) => {
+            vi.useFakeTimers();
+            const Indicator = appendIndicator();
+            let loading = true;
+            const ui = componentHarness(() => Indicator({ loading }));
+            ui.html();
+            vi.advanceTimersByTime(duration);
+            loading = false;
+            expect(ui.html()).toBe('');
+            vi.advanceTimersByTime(1000);
+            expect(ui.html()).toBe('');
+            expect(vi.getTimerCount()).toBe(0);
+        },
+    );
+
+    it('clears an append timer when its feed unmounts', () => {
+        vi.useFakeTimers();
+        const Indicator = appendIndicator();
+        const ui = componentHarness(() => Indicator({ loading: true }));
+        ui.html();
+        ui.unmount();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('keeps placeholders decorative without event identities or controls', () => {
+        const html = renderToStaticMarkup(<EventCardSkeleton count={2} />);
+        expect(html.match(/data-slot="event-card-skeleton"/g)).toHaveLength(2);
+        expect(html).toContain('aria-hidden="true"');
+        expect(html).toContain('motion-reduce:animate-none');
+        expect(html).not.toMatch(
+            /<button|<a |<ul|data-infinite-scroll|event-\d+-title/,
+        );
+    });
+});
+
+it('keeps loaded rows and uses the native Retry callback exactly once after append failure', () => {
+    localState.error = 'Unable to load more events. Please try again.';
+    scrollState.hasMore = true;
+    const page = props([event]);
+    const html = renderToStaticMarkup(
+        <EventFeed {...page} navigating={false} />,
+    );
+    expect(html).toContain('A New Chapter');
+    expect(html).toContain('Retry');
+    expect(scrollOptions).toHaveBeenLastCalledWith(
+        expect.objectContaining({ manual: true }),
+    );
+
+    const feed = EventFeed({ ...page, navigating: false });
+    const scroll = feed.props.children[1] as ReactElement<
+        ComponentProps<typeof InfiniteScroll>
+    >;
+    const next = scroll.props.next;
+    if (typeof next !== 'function')
+        throw new Error('Expected native next slot.');
+    const fetch = vi.fn();
+    const slot = next({
+        loading: false,
+        loadingPrevious: false,
+        loadingNext: false,
+        fetch,
+        hasMore: true,
+        hasNext: true,
+        hasPrevious: false,
+        autoMode: false,
+        manualMode: true,
+    }) as ReactElement<{
+        children: Array<ReactElement<ComponentProps<'button'>>>;
+    }>;
+    const retry = slot.props.children.find(
+        (child) => isValidElement(child) && child.props.type === 'button',
+    )!;
+    expect(retry.props.onClick).toBe(fetch);
+    retry.props.onClick!({} as never);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(page.events.data).toEqual([event]);
+});

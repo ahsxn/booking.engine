@@ -1,6 +1,7 @@
 # Ticketing v1 — vertical-slice implementation plan
 
-Status: **Slice 0 accepted; later slices are proposed and require their own approvals.**
+Status: **Slice 2A accepted per the owner's current Slice 2B planning request;
+Slice 2B is awaiting Gate B review; browser verification remains outstanding. Later slices require their own approvals.**
 
 **Roadmap revision (owner-agreed, 30 October 2026):** Split the original
 Slice 1 into two separately planned and accepted slices: **1A — Event domain
@@ -187,6 +188,12 @@ mutations, inventory accounting, admin CRUD, Stripe or copied Luma assets.
 
 ## Slice 2A — Event browsing behaviour and pagination
 
+**Detailed plan:** `docs/slice-plans/02a-event-browsing-pagination.md`.
+**Status:** Gate B accepted, as explicitly reported by the owner in the
+30 October 2026 Slice 2B planning request. The historical plan still records
+browser verification as pending; this tracking update records the owner's
+new acceptance without inventing missing command/browser evidence.
+
 **Customer-visible result:** Customers can browse Upcoming and Past
 events in separate views, with Upcoming selected by default. Events
 load progressively as customers scroll, without downloading the
@@ -244,6 +251,32 @@ entire catalogue.
 
 ## Slice 2B — Luma-inspired event calendar and visual design
 
+**Approved correction plan:** `docs/slice-plans/02b-event-browsing-frontend.md`
+(revision 5). **Status: Implementation awaiting Gate B final acceptance;
+manual browser verification remains required.** Gate A was approved on
+30 October 2026. The owner accepted the early visual checkpoint on
+31 October 2026: the design is sufficient for v1 and no further visual
+redesign/polish is required.
+
+Remaining approved work is implemented: 200ms delayed view/append card
+skeletons, screen-reader-only loading announcements, preserved feed geometry,
+cleanup on completion/error/cancel/unmount, and native preserveScroll:true
+for view/Start visits. Existing Inertia reset/partial props, preserveState:false,
+native history, infinite scrolling and retry ownership remain. No custom
+navigation/history coordinator or new dependency. Accepted visual components,
+CSS, photographs and all backend/data contracts are unchanged in this final
+increment; no development database write.
+
+Full composer ci:check passed: 67 frontend tests, TypeScript, formatting/lint,
+PHPStan/Pint and 198 PostgreSQL/PHP tests / 1,236 assertions. Both extra timezone
+runs passed 67 tests; production build passed. Actual browser loading/scroll/
+history/error acceptance is not claimed. The plan records the source diagnosis,
+verification limits and focused manual steps. **Stop at Gate B; no next slice.**
+
+Calendar remains visual only, current visitor-local month independent of
+event data, noninteractive and hidden on mobile. Functional calendar work,
+event details, ticket selection and all purchase flows remain deferred.
+
 **Customer-visible result:** A polished, responsive event browsing
 experience inspired by the layout hierarchy and interactions of
 https://luma.com/venicebookclub.
@@ -252,20 +285,24 @@ https://luma.com/venicebookclub.
 
 - Create an original organizer identity and visual presentation.
 - Build the organizer hero and cover section.
-- Implement the calendar layout and month navigation.
+- Implement the visual-only calendar layout. **Owner amendment:** month/date
+  navigation and all calendar functionality are deferred to a later slice;
+  this slice includes no selectable dates or event/availability indicators.
 - Display events using image-led cards and clear event details.
 - Show event-local dates, times, organizer and venue information.
 - Integrate the Upcoming/Past views and infinite scrolling
   implemented in Slice 2A into the finished design.
-- Ensure calendar dates and month grouping respect each event's
-  IANA timezone.
+- Display the current month in the visitor's local timezone using native
+  JavaScript Date, independent of event data; retain all event-local labels
+  and chronological server order.
+  Event month grouping/filtering is deferred with calendar functionality.
 - Use original branding, text, imagery and seeded event data.
 - Maintain responsive layouts for desktop and mobile.
 - Provide keyboard navigation, visible focus indicators,
   semantic markup and accessible interactions.
 - Implement appropriate empty states and visual feedback.
-- Test calendar month/year boundaries, event grouping,
-  responsive behaviour and navigation.
+- Test static calendar month/year/leap-year rendering, event-local date
+  presentation, responsive behaviour and existing browsing navigation.
 - Perform human visual QA against current reference screenshots
   at desktop and mobile sizes.
 
@@ -273,10 +310,12 @@ https://luma.com/venicebookclub.
 
 - The browsing page follows the agreed Luma-inspired
   information hierarchy and interaction patterns.
-- Calendar month navigation works correctly.
+- The calendar is visibly noninteractive and makes no availability claims.
+  Month navigation remains an outstanding v1 requirement for a later slice.
 - Upcoming/Past switching and infinite scrolling remain functional.
 - Event cards display correct information from PostgreSQL.
-- Event-local dates are grouped into the correct calendar months.
+- Event-local dates and static display-month rendering are correct without
+  regrouping or filtering the server-ordered feed.
 - Desktop/mobile visual QA and accessibility checks pass.
 - React, TypeScript, backend regression and build checks pass.
 
