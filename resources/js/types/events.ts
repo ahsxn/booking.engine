@@ -25,6 +25,22 @@ export type EventListing = {
 };
 
 export type EventView = 'upcoming' | 'past';
+
+export type EventDetail = EventListing & {
+    description: string;
+    selectionOpen: boolean;
+};
+
+export type EventDetailPageProps = {
+    event: EventDetail;
+};
+
+export type TicketQuantities = Partial<Record<number, number>>;
+
+export type TicketSelectionTotals = {
+    totalQuantity: number;
+    totalMinor: number;
+};
 export type EventListingPage = {
     current_page: number;
     current_page_url: string;

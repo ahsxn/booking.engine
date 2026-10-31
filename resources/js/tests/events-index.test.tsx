@@ -1,5 +1,6 @@
 import type { Mock } from 'vite-plus/test';
 vi.mock('@/routes', () => import('../routes'));
+vi.mock('@/routes/events', () => import('../routes/events'));
 vi.mock(
     '@/components/events/event-feed',
     () => import('../components/events/event-feed'),
@@ -1222,4 +1223,14 @@ it('keeps loaded rows and uses the native Retry callback exactly once after appe
     retry.props.onClick!({} as never);
     expect(fetch).toHaveBeenCalledOnce();
     expect(page.events.data).toEqual([event]);
+});
+
+it('links the event title and cover to its slug detail without changing the listing cover', () => {
+    const html = renderToStaticMarkup(<EventCard event={event} />);
+
+    expect(
+        html.match(new RegExp(`href="/events/${event.slug}"`, 'g')),
+    ).toHaveLength(2);
+    expect(html).toContain(`aria-label="View ${event.title}"`);
+    expect(html).toContain('width="128" height="128" loading="lazy"');
 });
