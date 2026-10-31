@@ -1,7 +1,9 @@
 # Ticketing v1 — vertical-slice implementation plan
 
-Status: **Slice 2A accepted per the owner's current Slice 2B planning request;
-Slice 2B is awaiting Gate B review; browser verification remains outstanding. Later slices require their own approvals.**
+Status: **Slices 2A and 2B accepted. The owner reconfirmed Slice 2B Gate B
+acceptance on 31 October 2026. Slice 3 Gate A and its desktop/mobile visual
+checkpoint are accepted. Slice 3 implementation is complete and awaiting
+Gate B acceptance; Slice 4 is not started.**
 
 **Roadmap revision (owner-agreed, 30 October 2026):** Split the original
 Slice 1 into two separately planned and accepted slices: **1A — Event domain
@@ -252,8 +254,9 @@ entire catalogue.
 ## Slice 2B — Luma-inspired event calendar and visual design
 
 **Approved correction plan:** `docs/slice-plans/02b-event-browsing-frontend.md`
-(revision 5). **Status: Implementation awaiting Gate B final acceptance;
-manual browser verification remains required.** Gate A was approved on
+(revision 5). **Status: Gate B accepted, reconfirmed by the owner on
+31 October 2026.** Historical verification limits below are preserved; this
+status correction does not invent additional browser evidence. Gate A was approved on
 30 October 2026. The owner accepted the early visual checkpoint on
 31 October 2026: the design is sufficient for v1 and no further visual
 redesign/polish is required.
@@ -270,8 +273,9 @@ increment; no development database write.
 Full composer ci:check passed: 67 frontend tests, TypeScript, formatting/lint,
 PHPStan/Pint and 198 PostgreSQL/PHP tests / 1,236 assertions. Both extra timezone
 runs passed 67 tests; production build passed. Actual browser loading/scroll/
-history/error acceptance is not claimed. The plan records the source diagnosis,
-verification limits and focused manual steps. **Stop at Gate B; no next slice.**
+history/error acceptance is not claimed by the automated evidence. The plan records
+the source diagnosis, verification limits and focused manual steps. Owner Gate B
+acceptance has since been reconfirmed; Slice 3 has its separate approval.
 
 Calendar remains visual only, current visitor-local month independent of
 event data, noninteractive and hidden on mobile. Functional calendar work,
@@ -327,17 +331,37 @@ https://luma.com/venicebookclub.
 
 ## Slice 3 — Event detail and ticket selection
 
+**Approved plan:** `docs/slice-plans/03-event-detail-ticket-selection.md`,
+revision 2 with owner conditions recorded on 31 October 2026. Implementation
+was initially authorized through the mandatory early visual checkpoint. The owner
+has now explicitly accepted that checkpoint and authorized the remaining
+quantity/local-total functionality, preserving the accepted colours/layout/spacing. Quantities
+and totals will be local React calculations; no preview endpoint. No live
+Available/Sold out claims before Slice 4 capacity accounting. The owner will
+perform matching desktop/mobile browser verification.
+
+**Gate B handoff (31 October 2026):** Independent +/- quantities, maximum 10
+combined, reactive integer-minor-unit GBP line/combined totals, selected/disabled
+states and accessible native buttons/focus handling implemented. Accepted
+colours, page layout and spacing retained. Get Tickets remains disabled;
+no booking, preview endpoint, inventory claim or Slice 4 work. Full CI passed:
+86 frontend tests, 206 PostgreSQL/PHP tests / 1,335 assertions, formatting/lint,
+TypeScript and PHPStan. Build and both timezone runs passed. Owner Gate B
+acceptance and final browser interaction review remain pending.
+
 **Customer-visible result:** Clicking an event opens its detailed page; users
-select multiple GA ticket types/quantities and see a server-priced GBP total.
+select multiple GA ticket types/quantities and see a locally calculated GBP total
+from server-provided catalogue prices (owner amendment, 31 October 2026).
 
 **In scope:**
 
 - Original event page hierarchy and layout inspired by the same browsing
   reference: cover, title, event-local schedule, venue, description, ticket
-  selector and Available/Sold out indicators.
+  selector; live Available/Sold out indicators deferred to Slice 4.
 - One-event selection, maximum 10 combined tickets, no exact availability
   counts, accessible validation and navigation.
-- Read-only validation and total preview; no capacity guarantee until a
+- Local quantity limits and total display; server-side validation and authoritative
+  pricing deferred to Slice 4. No capacity guarantee until a
   successful Checkout click in the next slice.
 
 **Exit evidence:** Demo selections, mobile views and validation tests.

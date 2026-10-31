@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import { MapPin, UsersRound } from 'lucide-react';
 import EventAttendeeStack from '@/components/events/event-attendee-stack';
 import EventCategoryBadge from '@/components/events/event-category-badge';
@@ -5,6 +6,7 @@ import EventCover from '@/components/events/event-cover';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { getEventCategory } from '@/lib/event-presentation';
+import { show } from '@/routes/events';
 import type { EventListing, TicketTypeListing } from '@/types/events';
 
 export default function EventCard({
@@ -72,7 +74,12 @@ export default function EventCard({
                             id={`event-${event.id}-title`}
                             className="mb-0.5 text-lg leading-snug font-medium tracking-tight sm:text-xl"
                         >
-                            {event.title}
+                            <Link
+                                href={show(event.slug)}
+                                className="rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                            >
+                                {event.title}
+                            </Link>
                         </h4>
                         <p className="flex items-start gap-1.5 text-sm leading-5 text-muted-foreground">
                             <UsersRound
@@ -105,11 +112,17 @@ export default function EventCard({
                             </div>
                         )}
                     </div>
-                    <EventCover
-                        key={event.coverImageUrl}
-                        src={event.coverImageUrl}
-                        title={event.title}
-                    />
+                    <Link
+                        href={show(event.slug)}
+                        aria-label={`View ${event.title}`}
+                        className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                    >
+                        <EventCover
+                            key={event.coverImageUrl}
+                            src={event.coverImageUrl}
+                            title={event.title}
+                        />
+                    </Link>
                 </div>
             </Card>
         </article>
